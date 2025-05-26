@@ -1,0 +1,37 @@
+Name: Eva
+
+Equipment: red pearl earings
+
+Personality: arrogant, evil, magic
+
+Age: 18
+
+Gender: Womman
+
+Hair_color: Black
+
+clothing: Black Dress
+
+face_shape: Round
+
+ethnicity: Latina
+
+
+
+Name: Adam
+
+Equipment: shining sword of light
+
+Personality: "emotional", "kind"
+
+Age: 200
+
+Gender: Man
+
+Hair_color: straight", "white
+
+clothing: white", "cloths
+
+face_shape: round
+
+ethnicity: pail white

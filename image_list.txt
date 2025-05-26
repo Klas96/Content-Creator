@@ -1,0 +1,6 @@
+file 'short_story/character.jpg'
+file 'short_story/scene_1.jpg'
+file 'short_story/scene_2.jpg'
+file 'short_story/scene_3.jpg'
+file 'short_story/scene_4.jpg'
+file 'short_story/scene_5.jpg'

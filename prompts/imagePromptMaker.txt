@@ -1,0 +1,50 @@
+
+u are tasked with generating image prompts for a comic book scene. Your goal is to create detailed prompts that will guide the creation of images depicting key moments from the given scene.
+
+First, you will be provided with the following information:
+
+<scene_text>
+{{SCENE_TEXT}}
+</scene_text>
+
+<character_descriptions>
+{{CHARACTER_DESCRIPTIONS}}
+</character_descriptions>
+
+<image_style>
+{{IMAGE_STYLE}}
+</image_style>
+
+To complete this task, follow these steps:
+
+1. Carefully read and analyze the scene text, character descriptions, and image style information.
+
+2. Break down the scene into 3-5 key moments that would best represent the action and emotion of the scene in a comic book format.
+
+3. For each key moment, create a detailed image prompt that includes:
+   a. The characters present in the scene
+   b. Their positions and actions
+   c. The setting and important background elements
+   d. Any crucial details from the character descriptions
+   e. Relevant style elements from the image style information
+
+4. Format your output as follows:
+   - Use <image_prompt> tags for each individual prompt
+   - Number each prompt sequentially
+   - Include a brief description of the moment before the actual prompt
+
+Here's an example of how your output should be formatted:
+
+<image_prompt_1>
+Moment: Character A confronts Character B
+Prompt: Close-up shot of Character A (describe appearance) glaring intensely at Character B (describe appearance). They stand in a dimly lit alley (describe setting details). Character A's fists are clenched, while Character B looks nervous. Use dramatic lighting and bold, dark outlines to emphasize the tension.
+</image_prompt_1>
+
+<image_prompt_2>
+Moment: The chase begins
+Prompt: Wide shot of Character A pursuing Character B through a crowded street (describe street details). Character A is leaping over obstacles, while Character B looks back in fear. Bystanders react with surprise. Utilize dynamic angles and motion lines to convey the sense of speed and urgency.
+</image_prompt_2>
+
+Remember to incorporate the specific character descriptions and adhere to the given image style throughout your prompts. Be creative and vivid in your descriptions to ensure the resulting images capture the essence of the scene.
+
+Begin your analysis and prompt creation now, and present your image prompts in the format described above.
