@@ -1,158 +1,128 @@
-import pytest
+import unittest
 from fastapi.testclient import TestClient
 from unittest.mock import patch, MagicMock
-import uuid # Import uuid for generating task IDs if needed for direct task manipulation
-import time # To simulate processing
+import uuid
 
 # Adjust the import path if your api.py is structured differently
 from api import app, tasks, VideoRequest # Import VideoRequest for POST payload
 
-# Fixture for the TestClient
-@pytest.fixture(scope="module")
-def client():
-    # If there's any app setup that happens on startup (like loading models),
-    # ensure it's compatible with testing or can be mocked.
-    return TestClient(app)
+class TestAPI(unittest.TestCase):
 
-# Fixture to clear the tasks dictionary before each test
-@pytest.fixture(autouse=True)
-def clear_tasks_dict_before_each_test():
-    tasks.clear()
+    @classmethod
+    def setUpClass(cls):
+        # This method is called once before all tests in the class
+        cls.client = TestClient(app)
 
-def test_read_root(client):
-    response = client.get("/")
-    assert response.status_code == 200
-    assert response.json() == {"message": "Video Generation API is running."}
+    def setUp(self):
+        # This method is called before each test
+        tasks.clear() # Clear tasks dict before each test
 
-@patch('api.run_video_creation') # Patch where the function is LOOKED UP (in api.py)
-def test_create_video_task_success(mock_run_video_creation, client):
-    # Mock the background task function directly
-    # It won't actually run in the background with TestClient in this setup,
-    # but we can simulate its effect on the `tasks` dict or test its invocation.
-    
-    character_desc = "A brave knight"
-    response = client.post("/videos", json={"character_description": character_desc})
-    
-    assert response.status_code == 200
-    json_response = response.json()
-    task_id = json_response.get("task_id")
-    
-    assert task_id is not None
-    assert json_response == {
-        "task_id": task_id,
-        "status": "processing",
-        "message": "Video generation task started."
-    }
-    
-    # Check if the background task was called (or would have been)
-    # For BackgroundTasks, direct assertion of call is tricky without more setup.
-    # Instead, we verify the state it's supposed to create.
-    assert task_id in tasks
-    assert tasks[task_id]["status"] == "processing"
-    
-    # To verify mock_run_video_creation was added to background_tasks:
-    # This requires deeper FastAPI/Starlette BackgroundTasks knowledge or a different mocking strategy.
-    # For now, we focus on the state change in `tasks` as a proxy.
-    # If `run_video_creation` was called directly (not as a background task), you'd do:
-    # mock_run_video_creation.assert_called_once_with(task_id, character_desc)
+    def tearDown(self):
+        # This method is called after each test
+        pass # Add any cleanup if necessary
 
+    @classmethod
+    def tearDownClass(cls):
+        # This method is called once after all tests in the class
+        pass
 
-def test_get_video_status_processing(client):
-    task_id = str(uuid.uuid4())
-    tasks[task_id] = {"status": "processing"}
-    
-    response = client.get(f"/videos/{task_id}")
-    assert response.status_code == 200
-    assert response.json() == {
-        "task_id": task_id,
-        "status": "processing",
-        "video_path": None,
-        "error": None
-        # "details" field is optional, so it might be missing if None, which is fine
-        # If it must be present as null, the endpoint or TaskStatusResponse needs adjustment
-    }
+    def test_read_root(self):
+        response = self.client.get("/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"message": "Video Generation API is running."})
 
-# To test completed/failed states, we need to simulate the background task finishing.
-# We can do this by manually setting the task state after the POST,
-# or by directly calling and mocking the `run_video_creation` logic.
-
-@patch('api.create_video_task') # Patching the core logic function
-def test_get_video_status_completed(mock_create_video, client):
-    # Simulate task creation via POST
-    character_desc = "A wise wizard"
-    post_response = client.post("/videos", json={"character_description": character_desc})
-    assert post_response.status_code == 200
-    task_id = post_response.json()["task_id"]
-
-    # Simulate successful completion by the (mocked) background task
-    expected_video_path = "output/mock_video.mp4"
-    mock_create_video.return_value = expected_video_path
-    
-    # Manually update the task status as the background task would
-    # This is a simplified way to test; for true background task testing,
-    # you might need tools like `fastapi.BackgroundTasks` with `asyncio.sleep`
-    # or a more robust task queue testing setup.
-    tasks[task_id] = {"status": "completed", "video_path": expected_video_path}
-    
-    response = client.get(f"/videos/{task_id}")
-    assert response.status_code == 200
-    # Add "details": None if your response model strictly requires it,
-    # or ensure Pydantic handles Optional fields correctly by omitting them if None.
-    # Based on current TaskStatusResponse, if details is not provided, it's fine.
-    assert response.json() == {
-        "task_id": task_id,
-        "status": "completed",
-        "video_path": expected_video_path,
-        "error": None
-    }
-    # If run_video_creation was called directly by post endpoint (not background):
-    # mock_create_video.assert_called_once_with(character_desc)
-
-
-@patch('api.create_video_task') # Patching the core logic function
-def test_get_video_status_failed(mock_create_video, client):
-    character_desc = "A clumsy dragon"
-    post_response = client.post("/videos", json={"character_description": character_desc})
-    assert post_response.status_code == 200
-    task_id = post_response.json()["task_id"]
-
-    # Simulate failure by the (mocked) background task
-    error_message = "Failed to generate story"
-    mock_create_video.side_effect = Exception(error_message)
-
-    # Manually update task status to reflect failure
-    tasks[task_id] = {"status": "failed", "error": error_message}
+    @patch('api.run_video_creation') # Patch where the function is LOOKED UP
+    def test_create_video_task_success(self, mock_run_video_creation):
+        character_desc = "A brave knight"
+        response = self.client.post("/videos", json={"character_description": character_desc})
         
-    response = client.get(f"/videos/{task_id}")
-    assert response.status_code == 200
-    assert response.json() == {
-        "task_id": task_id,
-        "status": "failed",
-        "video_path": None,
-        "error": error_message
-    }
+        self.assertEqual(response.status_code, 200)
+        json_response = response.json()
+        task_id = json_response.get("task_id")
+        
+        self.assertIsNotNone(task_id)
+        self.assertEqual(json_response, {
+            "task_id": task_id,
+            "status": "processing",
+            "message": "Video generation task started."
+        })
+        
+        self.assertIn(task_id, tasks)
+        self.assertEqual(tasks[task_id]["status"], "processing")
+        # mock_run_video_creation.assert_called_once_with(task_id, character_desc) 
+        # ^ This assertion is tricky with BackgroundTasks as it's not called directly in the test client's thread.
+        # We are verifying the side effect (task entry in `tasks` dict) which is a good proxy.
 
-def test_get_video_status_not_found(client):
-    non_existent_task_id = str(uuid.uuid4())
-    response = client.get(f"/videos/{non_existent_task_id}")
-    assert response.status_code == 404
-    assert response.json() == {"detail": f"Task with ID '{non_existent_task_id}' not found."}
+    def test_get_video_status_processing(self):
+        task_id = str(uuid.uuid4())
+        tasks[task_id] = {"status": "processing"}
+        
+        response = self.client.get(f"/videos/{task_id}")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {
+            "task_id": task_id,
+            "status": "processing",
+            "video_path": None,
+            "error": None,
+            "details": None # Assuming TaskStatusResponse includes details: Optional = None
+        })
 
-# It's good practice to also test edge cases for the POST request if any,
-# e.g., invalid payload, though Pydantic handles some of this automatically.
-def test_create_video_task_invalid_payload(client):
-    response = client.post("/videos", json={"wrong_field": "A brave knight"})
-    assert response.status_code == 422  # Unprocessable Entity from Pydantic
+    @patch('api.create_video_task') # Patching the core logic function
+    def test_get_video_status_completed(self, mock_create_video_task):
+        character_desc = "A wise wizard"
+        post_response = self.client.post("/videos", json={"character_description": character_desc})
+        self.assertEqual(post_response.status_code, 200)
+        task_id = post_response.json()["task_id"]
 
-# A note on the 'details' field in TaskStatusResponse:
-# Pydantic models by default omit fields that are None and not explicitly set.
-# If the API returns a field as `null`, then the expected JSON should include `"details": null`.
-# If the field is simply omitted when its value is None, then the current assertions are correct
-# (i.e. not including `details` in the expected dictionary).
-# The current `get_video_status` in `api.py` returns:
-# { "task_id": task_id, "status": task["status"], "video_path": task.get("video_path"), "error": task.get("error") }
-# This means 'details' will indeed be omitted if not present in the `task` dictionary.
-# So, the test assertions are consistent with the current `api.py` implementation.
-# If `TaskStatusResponse` had `details: Optional[Dict[str, Any]] = Field(default=None)` or similar to force output,
-# then tests would need `"details": None`.
-# For now, this is consistent.
+        expected_video_path = "output/mock_video.mp4"
+        mock_create_video_task.return_value = expected_video_path
+        
+        # Simulate background task completion
+        tasks[task_id] = {"status": "completed", "video_path": expected_video_path}
+        
+        response = self.client.get(f"/videos/{task_id}")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {
+            "task_id": task_id,
+            "status": "completed",
+            "video_path": expected_video_path,
+            "error": None,
+            "details": None # Assuming TaskStatusResponse includes details: Optional = None
+        })
+
+    @patch('api.create_video_task') # Patching the core logic function
+    def test_get_video_status_failed(self, mock_create_video_task):
+        character_desc = "A clumsy dragon"
+        post_response = self.client.post("/videos", json={"character_description": character_desc})
+        self.assertEqual(post_response.status_code, 200)
+        task_id = post_response.json()["task_id"]
+
+        error_message = "Failed to generate story"
+        mock_create_video_task.side_effect = Exception(error_message)
+
+        # Simulate background task failure
+        tasks[task_id] = {"status": "failed", "error": error_message}
+            
+        response = self.client.get(f"/videos/{task_id}")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {
+            "task_id": task_id,
+            "status": "failed",
+            "video_path": None,
+            "error": error_message,
+            "details": None # Assuming TaskStatusResponse includes details: Optional = None
+        })
+
+    def test_get_video_status_not_found(self):
+        non_existent_task_id = str(uuid.uuid4())
+        response = self.client.get(f"/videos/{non_existent_task_id}")
+        self.assertEqual(response.status_code, 404)
+        # The detail message might be slightly different, check actual API response if test fails
+        self.assertEqual(response.json(), {"detail": f"Task with ID '{non_existent_task_id}' not found."})
+
+    def test_create_video_task_invalid_payload(self):
+        response = self.client.post("/videos", json={"wrong_field": "A brave knight"})
+        self.assertEqual(response.status_code, 422) # Unprocessable Entity
+
+if __name__ == '__main__':
+    unittest.main()
