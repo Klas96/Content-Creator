@@ -4,16 +4,22 @@ import os
 
 # Initialize ElevenLabs client
 ELEVENLABS_KEY = os.getenv('ELEVENLABS_KEY')
-if not ELEVENLABS_KEY:
-    raise ValueError("ELEVENLABS_KEY not found in environment variables")
+eleven_client = None
 
-eleven_client = ElevenLabs(api_key=ELEVENLABS_KEY)
+if not TEST_MODE:
+    if not ELEVENLABS_KEY:
+        raise ValueError("ELEVENLABS_KEY not found in environment variables. Set it or run in TEST_MODE.")
+    eleven_client = ElevenLabs(api_key=ELEVENLABS_KEY)
 
 def generate_voice_over(text, output_path):
     if TEST_MODE:
         # Use mock generation in test mode
-        from main import generate_mock_voice_over
+        # This import needs to be here to avoid circular dependency if main also imports this file's functions
+        from main import generate_mock_voice_over 
         return generate_mock_voice_over(text, output_path)
+
+    if not eleven_client:
+        raise RuntimeError("ElevenLabs client not initialized. Ensure ELEVENLABS_KEY is set when not in TEST_MODE.")
 
     # Generate audio using the text-to-speech endpoint
     audio_stream = eleven_client.text_to_speech.convert(

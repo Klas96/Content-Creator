@@ -15,15 +15,20 @@ import re
 import subprocess
 from create_video import create_video
 from generate_voice_over import generate_voice_over
-
-# Test mode flag
-TEST_MODE = True  # Set to False to use real APIs
-
-# API Keys
+from config import ANTHROPIC_KEY, STABILITY_KEY, ELEVENLABS_KEY, TEST_MODE # Import TEST_MODE and keys from config
 
 # Initialize clients
-anthropic_client = Anthropic(api_key=ANTHROPIC_KEY)
-stability_client = stability_client.StabilityInference(key=STABILITY_KEY)
+anthropic_client = None
+stability_client_instance = None # Renamed to avoid conflict with module name 'stability_client'
+
+if not TEST_MODE:
+    if not ANTHROPIC_KEY:
+        raise ValueError("ANTHROPIC_KEY must be set if not in TEST_MODE.")
+    anthropic_client = Anthropic(api_key=ANTHROPIC_KEY)
+    
+    if not STABILITY_KEY:
+        raise ValueError("STABILITY_KEY must be set if not in TEST_MODE.")
+    stability_client_instance = stability_client.StabilityInference(key=STABILITY_KEY)
 
 def create_mock_image(width=512, height=512, color=(100, 100, 200), text="Test Image"):
     """Create a simple test image with text."""
@@ -123,6 +128,9 @@ After many days of travel, Arthur found a magical forest. The trees sparkled in 
     Focus on creating vivid imagery and emotional impact.
 
 \n\nAssistant: I'll create a short story based on the character description."""
+
+    if not anthropic_client:
+        raise RuntimeError("Anthropic client not initialized. Ensure ANTHROPIC_KEY is set when not in TEST_MODE.")
     
     response = anthropic_client.completions.create(
         prompt=story_prompt,
@@ -138,7 +146,9 @@ def generate_image(prompt, output_path):
         return generate_mock_image(prompt, output_path)
         
     # Generate image using Stability AI API
-    answers = stability_client.generate(
+    if not stability_client_instance:
+        raise RuntimeError("Stability client not initialized. Ensure STABILITY_KEY is set when not in TEST_MODE.")
+    answers = stability_client_instance.generate(
         prompt=prompt,
         seed=123,  # Fixed seed for reproducibility
         steps=30,  # Number of diffusion steps
