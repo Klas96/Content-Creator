@@ -14,3 +14,7 @@ transformers==4.37.2
 accelerate==0.27.2
 moviepy==2.0.0
 ffmpeg-python==0.2.0
+fastapi
+uvicorn[standard]
+pytest
+pytest-asyncio

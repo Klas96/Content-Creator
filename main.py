@@ -53,6 +53,60 @@ def load_text(directory, filename):
         text = f.read()
     return text
 
+def create_video_task(character_description: str) -> str:
+    # Create output directory
+    output_dir = "short_story"
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Generate story
+    print("Generating story...")
+    story = generate_short_story("", character_description) # Pass character_description here
+    
+    # Save story
+    with open(os.path.join(output_dir, "story.txt"), 'w') as f:
+        f.write(story)
+
+    # Generate images for key scenes
+    print("Generating images...")
+    image_paths = []
+    
+    # Generate character portrait
+    character_image_path = os.path.join(output_dir, "character.jpg")
+    generate_image(f"Portrait of {character_description}, high quality digital art, detailed, professional photography", character_image_path)
+    image_paths.append(character_image_path)
+    
+    # Generate scene images based on story paragraphs
+    scene_prompts = create_scene_prompts(story)
+    for i, prompt in enumerate(scene_prompts):
+        scene_image_path = os.path.join(output_dir, f"scene_{i+1}.jpg")
+        generate_image(prompt, scene_image_path)
+        image_paths.append(scene_image_path)
+    
+    # Generate voice-over
+    print("Generating voice-over...")
+    voice_over_path = os.path.join(output_dir, "voice_over.mp3")
+    if TEST_MODE:
+        generate_mock_voice_over(story, voice_over_path.replace('.mp3', '.wav'))
+    else:
+        generate_voice_over(story, voice_over_path)
+    
+    # Generate background music (1 minute)
+    print("Generating background music...")
+    background_music_path = os.path.join(output_dir, "background_music.wav")
+    generate_background_music(60, background_music_path)
+    
+    # Create video
+    print("Creating video...")
+    video_path = os.path.join(output_dir, "story_video.mp4")
+    create_video(image_paths, voice_over_path, background_music_path, video_path)
+    
+    print(f"\nStory generation complete! All files are saved in the '{output_dir}' directory.")
+    print("\nStory preview:")
+    print("-" * 50)
+    print(story[:200] + "...")
+    print("-" * 50)
+    return video_path
+
 def generate_short_story(prompt, character_description):
     if TEST_MODE:
         # Return a test story
@@ -124,57 +178,11 @@ def main():
     # Load character description
     character_description = load_text('input', 'characterDescriptions.txt')
     
-    # Create output directory
-    output_dir = "short_story"
-    os.makedirs(output_dir, exist_ok=True)
+    # Create video task
+    video_path = create_video_task(character_description)
     
-    # Generate story
-    print("Generating story...")
-    story = generate_short_story("", character_description)
-    
-    # Save story
-    with open(os.path.join(output_dir, "story.txt"), 'w') as f:
-        f.write(story)
-
-    # Generate images for key scenes
-    print("Generating images...")
-    image_paths = []
-    
-    # Generate character portrait
-    character_image_path = os.path.join(output_dir, "character.jpg")
-    generate_image(f"Portrait of {character_description}, high quality digital art, detailed, professional photography", character_image_path)
-    image_paths.append(character_image_path)
-    
-    # Generate scene images based on story paragraphs
-    scene_prompts = create_scene_prompts(story)
-    for i, prompt in enumerate(scene_prompts):
-        scene_image_path = os.path.join(output_dir, f"scene_{i+1}.jpg")
-        generate_image(prompt, scene_image_path)
-        image_paths.append(scene_image_path)
-    
-    # Generate voice-over
-    print("Generating voice-over...")
-    voice_over_path = os.path.join(output_dir, "voice_over.mp3")
-    if TEST_MODE:
-        generate_mock_voice_over(story, voice_over_path.replace('.mp3', '.wav'))
-    else:
-        generate_voice_over(story, voice_over_path)
-    
-    # Generate background music (1 minute)
-    print("Generating background music...")
-    background_music_path = os.path.join(output_dir, "background_music.wav")
-    generate_background_music(60, background_music_path)
-    
-    # Create video
-    print("Creating video...")
-    video_path = os.path.join(output_dir, "story_video.mp4")
-    create_video(image_paths, voice_over_path, background_music_path, video_path)
-    
-    print(f"\nStory generation complete! All files are saved in the '{output_dir}' directory.")
-    print("\nStory preview:")
-    print("-" * 50)
-    print(story[:200] + "...")
-    print("-" * 50)
+    # Print the path to the generated video
+    print(f"Video created successfully: {video_path}")
 
 if __name__ == "__main__":
     main()
