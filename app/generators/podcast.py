@@ -1,9 +1,11 @@
 import asyncio
-from anthropic import Anthropic
-from ..config import ANTHROPIC_KEY, TEST_MODE
+# from anthropic import Anthropic # Removed
+# from ..config import ANTHROPIC_KEY, TEST_MODE # ANTHROPIC_KEY removed, TEST_MODE kept
+from ..config import TEST_MODE # Keep TEST_MODE
+from ..llm_clients import generate_text_completion # Import new function
 
-# Initialize Anthropic client
-anthropic_client = Anthropic(api_key=ANTHROPIC_KEY)
+# # Initialize Anthropic client # Removed
+# anthropic_client = Anthropic(api_key=ANTHROPIC_KEY)
 
 async def generate_podcast_from_custom_text(text: str) -> str:
     """Generates podcast content directly from custom text."""
@@ -20,17 +22,25 @@ async def generate_podcast_from_topic(topic: str) -> str:
 
 Assistant: Here's a podcast script about {topic}:"""
     try:
-        response = await asyncio.to_thread(
-            anthropic_client.completions.create,
+        # response = await asyncio.to_thread( # Replaced
+        #     anthropic_client.completions.create,
+        #     prompt=prompt,
+        #     model="claude-2",
+        #     max_tokens_to_sample=2000,
+        #     temperature=0.7
+        # )
+        # return response.completion
+        generated_script = await generate_text_completion(
             prompt=prompt,
-            model="claude-2",
-            max_tokens_to_sample=2000,
-            temperature=0.7
+            temperature=0.7,
+            max_tokens=2000
         )
-        return response.completion
+        if generated_script.startswith("Error:"): # Check if our new function returned an error
+            raise Exception(generated_script)
+        return generated_script
     except Exception as e:
         print(f"Error generating podcast from topic: {e}")
-        return f"Error: Could not generate podcast for topic '{topic}'."
+        return f"Error: Could not generate podcast for topic '{topic}'. Details: {e}"
 
 async def generate_free_podcast() -> str:
     """Generates a freeform podcast on an engaging topic."""
@@ -41,17 +51,25 @@ async def generate_free_podcast() -> str:
 
 Assistant: Here's a podcast script on an interesting topic:"""
     try:
-        response = await asyncio.to_thread(
-            anthropic_client.completions.create,
+        # response = await asyncio.to_thread( # Replaced
+        #     anthropic_client.completions.create,
+        #     prompt=prompt,
+        #     model="claude-2",
+        #     max_tokens_to_sample=2000,
+        #     temperature=0.7
+        # )
+        # return response.completion
+        generated_script = await generate_text_completion(
             prompt=prompt,
-            model="claude-2",
-            max_tokens_to_sample=2000,
-            temperature=0.7
+            temperature=0.7,
+            max_tokens=2000
         )
-        return response.completion
+        if generated_script.startswith("Error:"): # Check if our new function returned an error
+            raise Exception(generated_script)
+        return generated_script
     except Exception as e:
         print(f"Error generating freeform podcast: {e}")
-        return "Error: Could not generate freeform podcast."
+        return f"Error: Could not generate freeform podcast. Details: {e}"
 
 if __name__ == '__main__':
     # Example usage (for testing purposes)

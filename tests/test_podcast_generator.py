@@ -36,33 +36,41 @@ async def test_generate_podcast_from_topic_test_mode():
         result = await generate_podcast_from_topic(topic)
         assert result == f"Test mode: Podcast for topic: {topic}"
 
-@patch('app.generators.podcast.anthropic_client.completions.create', new_callable=AsyncMock)
-async def test_generate_podcast_from_topic_normal_mode(mock_anthropic_create):
-    """Test generate_podcast_from_topic in normal mode with mocked Anthropic client."""
+@patch('app.llm_clients.generate_text_completion', new_callable=AsyncMock)
+async def test_generate_podcast_from_topic_normal_mode(mock_generate_text):
+    """Test generate_podcast_from_topic in normal mode with mocked generic LLM client."""
     with patch('app.generators.podcast.TEST_MODE', False):
         topic = "artificial intelligence ethics"
-        expected_script = f"Mocked podcast script about {topic}"
-        mock_anthropic_create.return_value.completion = expected_script
+        expected_script = f"Mocked podcast script about {topic} from generic client"
+        mock_generate_text.return_value = expected_script
 
         result = await generate_podcast_from_topic(topic)
 
-        mock_anthropic_create.assert_called_once()
-        # We can also check the prompt if necessary, but for now, checking call and result is good.
-        # call_args = mock_anthropic_create.call_args
-        # assert topic in call_args.kwargs['prompt']
+        mock_generate_text.assert_called_once()
+        # We can check specific arguments if needed:
+        # args, kwargs = mock_generate_text.call_args
+        # assert topic in kwargs['prompt']
+        # assert kwargs['temperature'] == 0.7
+        # assert kwargs['max_tokens'] == 2000
         assert result == expected_script
 
-@patch('app.generators.podcast.anthropic_client.completions.create', new_callable=AsyncMock)
-async def test_generate_podcast_from_topic_api_error(mock_anthropic_create):
-    """Test generate_podcast_from_topic when Anthropic API call fails."""
+@patch('app.llm_clients.generate_text_completion', new_callable=AsyncMock)
+async def test_generate_podcast_from_topic_api_error(mock_generate_text):
+    """Test generate_podcast_from_topic when the generic LLM client returns an error string."""
     with patch('app.generators.podcast.TEST_MODE', False):
         topic = "quantum physics"
-        mock_anthropic_create.side_effect = Exception("API Communication Error")
+        # Simulate an error message returned by generate_text_completion
+        mock_generate_text.return_value = "Error: Underlying API Communication Error"
+        # Or, to simulate an exception raised by generate_text_completion itself
+        # mock_generate_text.side_effect = Exception("LLM Client Exception")
+
 
         result = await generate_podcast_from_topic(topic)
 
-        mock_anthropic_create.assert_called_once()
-        assert result == f"Error: Could not generate podcast for topic '{topic}'."
+        mock_generate_text.assert_called_once()
+        # The error message from podcast.py includes the original error.
+        assert "Error: Could not generate podcast for topic 'quantum physics'." in result
+        assert "Details: Error: Underlying API Communication Error" in result
 
 
 # --- Tests for generate_free_podcast ---
@@ -73,28 +81,32 @@ async def test_generate_free_podcast_test_mode():
         result = await generate_free_podcast()
         assert result == "Test mode: Freeform podcast generated."
 
-@patch('app.generators.podcast.anthropic_client.completions.create', new_callable=AsyncMock)
-async def test_generate_free_podcast_normal_mode(mock_anthropic_create):
-    """Test generate_free_podcast in normal mode with mocked Anthropic client."""
+@patch('app.llm_clients.generate_text_completion', new_callable=AsyncMock)
+async def test_generate_free_podcast_normal_mode(mock_generate_text):
+    """Test generate_free_podcast in normal mode with mocked generic LLM client."""
     with patch('app.generators.podcast.TEST_MODE', False):
-        expected_script = "Mocked creative freeform podcast script."
-        mock_anthropic_create.return_value.completion = expected_script
+        expected_script = "Mocked creative freeform podcast script from generic client."
+        mock_generate_text.return_value = expected_script
 
         result = await generate_free_podcast()
 
-        mock_anthropic_create.assert_called_once()
+        mock_generate_text.assert_called_once()
         assert result == expected_script
 
-@patch('app.generators.podcast.anthropic_client.completions.create', new_callable=AsyncMock)
-async def test_generate_free_podcast_api_error(mock_anthropic_create):
-    """Test generate_free_podcast when Anthropic API call fails."""
+@patch('app.llm_clients.generate_text_completion', new_callable=AsyncMock)
+async def test_generate_free_podcast_api_error(mock_generate_text):
+    """Test generate_free_podcast when the generic LLM client returns an error string."""
     with patch('app.generators.podcast.TEST_MODE', False):
-        mock_anthropic_create.side_effect = Exception("API Freeform Error")
+        # Simulate an error message returned by generate_text_completion
+        mock_generate_text.return_value = "Error: Underlying API Freeform Error"
+        # Or, to simulate an exception raised by generate_text_completion itself
+        # mock_generate_text.side_effect = Exception("LLM Client Exception")
 
         result = await generate_free_podcast()
 
-        mock_anthropic_create.assert_called_once()
-        assert result == "Error: Could not generate freeform podcast."
+        mock_generate_text.assert_called_once()
+        assert "Error: Could not generate freeform podcast." in result
+        assert "Details: Error: Underlying API Freeform Error" in result
 
 if __name__ == '__main__':
     # This block allows running tests with `python tests/test_podcast_generator.py`

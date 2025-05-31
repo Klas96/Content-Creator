@@ -13,6 +13,10 @@ __pycache__/
 venv/
 ENV/
 
+# IDE specific
+.vscode/
+.idea/
+
 # Project specific
 output/
 short_story/

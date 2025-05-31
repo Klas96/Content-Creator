@@ -20,3 +20,8 @@ if not ELEVENLABS_KEY:
 # Configuration
 TEST_MODE = os.getenv('TEST_MODE', 'False').lower() == 'true'
 OUTPUT_DIR = os.getenv('OUTPUT_DIR', 'short_story')
+
+# LLM Provider Configuration
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "anthropic").lower()
+OLLAMA_API_BASE_URL = os.getenv("OLLAMA_API_BASE_URL", "http://localhost:11434")
+OLLAMA_MODEL_NAME = os.getenv("OLLAMA_MODEL_NAME", "llama2")
