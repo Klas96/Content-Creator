@@ -1,0 +1,11 @@
+Human: You are a creative author. Write a chapter for a book.
+The book is in the {genre} genre.
+The chapter should have a {style_tone} style and tone.
+{characters_section}
+{plot_summary_section}
+{previous_chapter_summary_section}
+The main focus or topic of this specific chapter is: {chapter_topic}. If no specific chapter topic is given, determine a suitable progression based on other context.
+This chapter should be approximately {desired_length_words} words long. If no length is specified, make it substantial for a typical book chapter.
+Develop the characters and advance the plot. Use vivid descriptions and engaging dialogue where appropriate.
+{custom_instructions_section}
+Assistant: Here is the book chapter:

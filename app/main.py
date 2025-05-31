@@ -20,6 +20,10 @@ from .generators.podcast import (
     generate_podcast_from_topic,
     generate_free_podcast,
 )
+from .generators.article import generate_article
+from .generators.social import generate_tweet_thread
+from .generators.book import generate_book_chapter
+import json # For saving tweet_thread output
 from .config import OUTPUT_DIR
 
 # Define request models
@@ -28,13 +32,44 @@ class PodcastGenerationOptions(BaseModel):
     custom_text: Optional[str] = None
     topic: Optional[str] = None
 
+class ArticleOptions(BaseModel):
+    custom_instructions: Optional[str] = None
+    # placeholder for future article-specific options like section_titles, target_audience
+
+class TweetOptions(BaseModel):
+    num_tweets: int = Query(default=3, ge=1, le=10) # Default to 3 tweets, min 1, max 10
+    call_to_action: Optional[str] = None
+    # placeholder for future tweet-specific options like tone (e.g. "professional", "witty")
+
+class BookChapterOptions(BaseModel):
+    plot_summary: Optional[str] = None
+    chapter_topic: Optional[str] = None # More specific topic for the chapter
+    previous_chapter_summary: Optional[str] = None
+    characters: Optional[List[str]] = None
+    genre: Optional[str] = None
+    # placeholder for future book-specific options
+
 class ContentRequest(BaseModel):
-    content_type: Literal["story", "educational", "podcast"]
-    topic: str  # character_description for stories, topic for educational content
+    content_type: Literal["story", "educational", "podcast", "article", "tweet_thread", "book_chapter"]
+    topic: str  # character_description for stories, topic for educational content, primary subject for text types
+
+    # Video/Educational specific (could be refactored further if more types emerge)
     video_prompt: Optional[str] = None
     educational_style: Optional[Literal["lecture", "tutorial", "explainer"]] = None
     difficulty_level: Optional[Literal["beginner", "intermediate", "advanced"]] = None
+
+    # Podcast specific
     podcast_options: Optional[PodcastGenerationOptions] = None
+
+    # New text-specific options
+    article_options: Optional[ArticleOptions] = None
+    tweet_options: Optional[TweetOptions] = None
+    book_chapter_options: Optional[BookChapterOptions] = None
+
+    # Common text generation parameters
+    desired_length_words: Optional[int] = Query(default=0, ge=0) # 0 might mean model default or not applicable
+    style_tone: Optional[str] = None  # e.g., "formal", "casual", "technical", "humorous"
+
 
 # Add new models
 class VideoInfo(BaseModel):
@@ -123,25 +158,42 @@ async def download_content(job_id: str):
     if job_info["status"] != "completed":
         raise HTTPException(status_code=400, detail="Content generation not completed")
 
-    if job_info["content_type"] == "podcast":
-        audio_path = os.path.join(job_info["output_dir"], "podcast_audio.mp3")
-        if not os.path.exists(audio_path):
-            raise HTTPException(status_code=404, detail="Podcast audio file not found")
-        return FileResponse(
-            audio_path,
-            media_type="audio/mpeg",
-            filename=f"podcast_{job_id}.mp3"
-        )
-    else:
-        video_path = os.path.join(job_info["output_dir"], "content_video.mp4")
-        if not os.path.exists(video_path):
-            raise HTTPException(status_code=404, detail="Video file not found")
+    output_filename = job_info.get("output_filename")
+    media_type = job_info.get("media_type")
+    content_type = job_info["content_type"] # Original content type for filename construction
 
-        return FileResponse(
-            video_path,
-            media_type="video/mp4",
-            filename=f"{job_info['content_type']}_{job_id}.mp4"
-        )
+    if not output_filename or not media_type:
+        # Fallback for older jobs or if these keys weren't stored (should not happen for new jobs)
+        if content_type == "podcast":
+            output_filename = "podcast_audio.mp3"
+            media_type = "audio/mpeg"
+        elif content_type in ["story", "educational"]:
+            output_filename = "content_video.mp4"
+            media_type = "video/mp4"
+        else:
+            raise HTTPException(status_code=500, detail="Job output information is incomplete.")
+
+    file_path = os.path.join(job_info["output_dir"], output_filename)
+
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail=f"{output_filename} not found in job output.")
+
+    # Construct a user-friendly download filename
+    base_filename, file_ext = os.path.splitext(output_filename)
+    if not file_ext: # for cases where output_filename might not have an extension (e.g. from older setup)
+        if media_type == "application/json": file_ext = ".json"
+        elif media_type == "text/plain": file_ext = ".txt"
+        elif media_type == "audio/mpeg": file_ext = ".mp3"
+        elif media_type == "video/mp4": file_ext = ".mp4"
+        else: file_ext = "" # Default if unknown
+
+    download_filename = f"{content_type}_{job_id}{file_ext}"
+
+    return FileResponse(
+        file_path,
+        media_type=media_type,
+        filename=download_filename
+    )
 
 @app.get("/videos", response_model=List[VideoInfo])
 async def list_videos(
@@ -272,53 +324,28 @@ async def get_video_info(job_id: str):
 
 async def process_content_generation(job_id: str, request: ContentRequest, output_dir: str):
     try:
+        output_filename = None
+        media_type = None
+        text_content_only = False # Flag to skip media generation for text-only types
+
         if request.content_type == "story" or request.content_type == "educational":
-            # Generate content based on type
             if request.content_type == "story":
-                content = await generate_story(request.topic)  # topic is character_description
+                content = await generate_story(request.topic)
             else: # educational
                 content = await generate_educational_content(
                     request.topic,
                     request.educational_style,
                     request.difficulty_level
                 )
-
-            # Save content
-            content_path = os.path.join(output_dir, "content.txt")
-            with open(content_path, 'w') as f:
+            output_filename = "content.txt"
+            media_type = "text/plain" # For the script itself
+            with open(os.path.join(output_dir, output_filename), 'w') as f:
                 f.write(content)
 
-            # Generate images
-            image_paths = await generate_images(
-                content,
-                request.topic,
-                output_dir,
-                content_type=request.content_type
-            )
-
-            # Generate voice-over
-            voice_over_path = os.path.join(output_dir, "voice_over.mp3")
-            await generate_voice_over(content, voice_over_path)
-
-            # Generate background music
-            background_music_path = os.path.join(output_dir, "background_music.wav")
-            await generate_background_music(60, background_music_path)
-
-            # Create video
-            video_path = os.path.join(output_dir, "content_video.mp4")
-            await create_video_async(
-                image_paths,
-                voice_over_path,
-                background_music_path,
-                video_path,
-                video_prompt=request.video_prompt,
-                content_type=request.content_type
-            )
-
-            active_jobs[job_id]["status"] = "completed"
-            active_jobs[job_id]["completed_at"] = datetime.now().isoformat()
+            # These types will proceed to media generation
 
         elif request.content_type == "podcast":
+            text_content_only = True # Podcast audio is handled, but no video/images unless specified
             if not request.podcast_options:
                 raise ValueError("Podcast options not provided for podcast content type.")
 
@@ -328,10 +355,7 @@ async def process_content_generation(job_id: str, request: ContentRequest, outpu
                     raise ValueError("Custom text not provided for custom_text podcast type.")
                 podcast_script = await generate_podcast_from_custom_text(request.podcast_options.custom_text)
             elif request.podcast_options.podcast_type == "topic_based":
-                if not request.podcast_options.topic:
-                    # Fallback to main topic if podcast-specific topic is not provided
-                    # Though API design implies podcast_options.topic should be used if present.
-                    # For now, let's assume it *must* be present if type is topic_based.
+                if not request.podcast_options.topic: # This uses the podcast_options.topic
                     raise ValueError("Topic not provided for topic_based podcast type.")
                 podcast_script = await generate_podcast_from_topic(request.podcast_options.topic)
             elif request.podcast_options.podcast_type == "free_generation":
@@ -339,26 +363,133 @@ async def process_content_generation(job_id: str, request: ContentRequest, outpu
             else:
                 raise ValueError(f"Invalid podcast type: {request.podcast_options.podcast_type}")
 
-            if podcast_script:
-                script_path = os.path.join(output_dir, "podcast_script.txt")
-                with open(script_path, 'w') as f:
-                    f.write(podcast_script)
+            if not podcast_script or podcast_script.startswith("Error:"):
+                raise ValueError(f"Podcast script generation failed: {podcast_script}")
 
-                voice_over_path = os.path.join(output_dir, "podcast_audio.mp3")
-                await generate_voice_over(podcast_script, voice_over_path)
+            script_path = os.path.join(output_dir, "podcast_script.txt")
+            with open(script_path, 'w') as f:
+                f.write(podcast_script)
 
-                active_jobs[job_id]["status"] = "completed"
-                active_jobs[job_id]["completed_at"] = datetime.now().isoformat()
+            output_filename = "podcast_audio.mp3" # Main output for podcast
+            media_type = "audio/mpeg"
+            voice_over_path = os.path.join(output_dir, output_filename)
+            await generate_voice_over(podcast_script, voice_over_path)
 
-                audio_filename = f"{job_id}.mp3"
-                public_audio_path = os.path.join("static/audios", audio_filename)
-                source_audio_path = voice_over_path # This is os.path.join(output_dir, "podcast_audio.mp3")
+            audio_file_to_copy = f"{job_id}.mp3"
+            public_audio_path = os.path.join("static/audios", audio_file_to_copy)
+            shutil.copy2(voice_over_path, public_audio_path)
+            active_jobs[job_id]["audio_url"] = f"/static/audios/{audio_file_to_copy}"
+            # Store info for download endpoint
+            active_jobs[job_id]["output_filename"] = output_filename
+            active_jobs[job_id]["media_type"] = media_type
 
-                shutil.copy2(source_audio_path, public_audio_path)
-                active_jobs[job_id]["audio_url"] = f"/static/audios/{audio_filename}"
+        elif request.content_type == "article":
+            text_content_only = True
+            if not request.article_options:
+                # Providing default empty options if None, or raise error if it must be provided
+                request.article_options = ArticleOptions() # Or raise ValueError
 
-            else:
-                raise ValueError("Podcast script generation failed.")
+            generated_text = await generate_article(
+                topic=request.topic,
+                desired_length_words=request.desired_length_words or 0,
+                style_tone=request.style_tone,
+                custom_instructions=request.article_options.custom_instructions
+            )
+            if generated_text.startswith("Error:"):
+                raise ValueError(f"Article generation failed: {generated_text}")
+
+            output_filename = "article.txt"
+            media_type = "text/plain"
+            with open(os.path.join(output_dir, output_filename), 'w') as f:
+                f.write(generated_text)
+            active_jobs[job_id]["output_filename"] = output_filename
+            active_jobs[job_id]["media_type"] = media_type
+
+        elif request.content_type == "tweet_thread":
+            text_content_only = True
+            if not request.tweet_options:
+                request.tweet_options = TweetOptions() # Or raise ValueError
+
+            tweet_list = await generate_tweet_thread(
+                topic=request.topic,
+                num_tweets=request.tweet_options.num_tweets,
+                style_tone=request.style_tone,
+                call_to_action=request.tweet_options.call_to_action,
+                custom_instructions=None # Assuming not yet added to TweetOptions in this example
+            )
+            if isinstance(tweet_list, list) and tweet_list and tweet_list[0].startswith("Error:"):
+                 raise ValueError(f"Tweet thread generation failed: {tweet_list[0]}")
+
+            output_filename = "tweet_thread.json"
+            media_type = "application/json"
+            with open(os.path.join(output_dir, output_filename), 'w') as f:
+                json.dump(tweet_list, f, indent=2)
+            active_jobs[job_id]["output_filename"] = output_filename
+            active_jobs[job_id]["media_type"] = media_type
+
+        elif request.content_type == "book_chapter":
+            text_content_only = True
+            if not request.book_chapter_options:
+                request.book_chapter_options = BookChapterOptions() # Or raise ValueError
+
+            generated_text = await generate_book_chapter(
+                plot_summary=request.book_chapter_options.plot_summary,
+                chapter_topic=request.book_chapter_options.chapter_topic or request.topic,
+                previous_chapter_summary=request.book_chapter_options.previous_chapter_summary,
+                characters=request.book_chapter_options.characters,
+                genre=request.book_chapter_options.genre,
+                style_tone=request.style_tone,
+                desired_length_words=request.desired_length_words or 0,
+                custom_instructions=None # Assuming not yet added to BookChapterOptions
+            )
+            if generated_text.startswith("Error:"):
+                raise ValueError(f"Book chapter generation failed: {generated_text}")
+
+            output_filename = "book_chapter.txt"
+            media_type = "text/plain"
+            with open(os.path.join(output_dir, output_filename), 'w') as f:
+                f.write(generated_text)
+            active_jobs[job_id]["output_filename"] = output_filename
+            active_jobs[job_id]["media_type"] = media_type
+
+        else:
+            raise ValueError(f"Unsupported content type: {request.content_type}")
+
+        # --- Media Generation (only for specific types) ---
+        if not text_content_only and (request.content_type == "story" or request.content_type == "educational"):
+            # This block is for story and educational which produce video
+            # Content was already fetched and saved as content.txt for these types
+            script_content_path = os.path.join(output_dir, "content.txt")
+            with open(script_content_path, 'r') as f:
+                content_for_media = f.read()
+
+            image_paths = await generate_images(
+                content_for_media,
+                request.topic,
+                output_dir,
+                content_type=request.content_type
+            )
+
+            voice_over_path = os.path.join(output_dir, "voice_over.mp3")
+            await generate_voice_over(content_for_media, voice_over_path)
+
+            background_music_path = os.path.join(output_dir, "background_music.wav")
+            await generate_background_music(60, background_music_path)
+
+            video_path = os.path.join(output_dir, "content_video.mp4") # Main output for these types
+            await create_video_async(
+                image_paths,
+                voice_over_path,
+                background_music_path,
+                video_path,
+                video_prompt=request.video_prompt,
+                content_type=request.content_type
+            )
+            active_jobs[job_id]["output_filename"] = "content_video.mp4" # For download
+            active_jobs[job_id]["media_type"] = "video/mp4" # For download
+
+        active_jobs[job_id]["status"] = "completed"
+        active_jobs[job_id]["completed_at"] = datetime.now().isoformat()
         
     except Exception as e:
         active_jobs[job_id]["status"] = "failed"

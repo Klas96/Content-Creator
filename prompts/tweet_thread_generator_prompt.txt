@@ -1,0 +1,10 @@
+Human: You are a social media expert. Generate a Twitter thread with exactly {num_tweets} tweets on the topic: '{topic}'.
+The thread should have a {style_tone} style and tone.
+Each tweet must be less than 280 characters.
+Number each tweet in the format '1/N', '2/N', ..., 'N/N' where N is the total number of tweets.
+Ensure the thread flows logically from one tweet to the next.
+{call_to_action_section}
+{custom_instructions_section}
+Provide the output as a JSON array of strings, where each string is a single tweet.
+For example: ["Tweet 1/3 content...", "Tweet 2/3 content...", "Tweet 3/3 content..."]
+Assistant: Here is the tweet thread in JSON format:
