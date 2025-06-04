@@ -33,25 +33,30 @@ async def test_generate_podcast_from_topic_test_mode():
     """Test generate_podcast_from_topic in TEST_MODE."""
     with patch('app.generators.podcast.TEST_MODE', True):
         topic = "the history of jazz"
-        result = await generate_podcast_from_topic(topic)
-        assert result == f"Test mode: Podcast for topic: {topic}"
+        duration = 7
+        result = await generate_podcast_from_topic(topic, duration_minutes=duration)
+        assert result == f"Test mode: Dialogue podcast for topic: '{topic}' for {duration} minutes."
 
 @patch('app.llm_clients.generate_text_completion', new_callable=AsyncMock)
-async def test_generate_podcast_from_topic_normal_mode(mock_generate_text):
-    """Test generate_podcast_from_topic in normal mode with mocked generic LLM client."""
+async def test_generate_podcast_from_topic_normal_mode_dialogue(mock_generate_text):
+    """Test generate_podcast_from_topic in normal mode for dialogue generation."""
     with patch('app.generators.podcast.TEST_MODE', False):
         topic = "artificial intelligence ethics"
-        expected_script = f"Mocked podcast script about {topic} from generic client"
+        duration = 10
+        expected_script = f"""Speaker A: Welcome to the discussion on {topic}.
+Speaker B: It's a complex {duration} minute topic!
+Speaker A: Indeed. Let's dive in."""
         mock_generate_text.return_value = expected_script
 
-        result = await generate_podcast_from_topic(topic)
+        result = await generate_podcast_from_topic(topic, duration_minutes=duration)
 
         mock_generate_text.assert_called_once()
-        # We can check specific arguments if needed:
-        # args, kwargs = mock_generate_text.call_args
-        # assert topic in kwargs['prompt']
-        # assert kwargs['temperature'] == 0.7
-        # assert kwargs['max_tokens'] == 2000
+        # Example of checking specific parts of the prompt:
+        args, kwargs = mock_generate_text.call_args
+        assert topic in kwargs['prompt']
+        assert str(duration) in kwargs['prompt']
+        assert "Speaker A:" in kwargs['prompt'] # Check if dialogue instructions are in prompt
+        assert "Speaker B:" in kwargs['prompt']
         assert result == expected_script
 
 @patch('app.llm_clients.generate_text_completion', new_callable=AsyncMock)
@@ -59,13 +64,14 @@ async def test_generate_podcast_from_topic_api_error(mock_generate_text):
     """Test generate_podcast_from_topic when the generic LLM client returns an error string."""
     with patch('app.generators.podcast.TEST_MODE', False):
         topic = "quantum physics"
+        duration = 5
         # Simulate an error message returned by generate_text_completion
         mock_generate_text.return_value = "Error: Underlying API Communication Error"
         # Or, to simulate an exception raised by generate_text_completion itself
         # mock_generate_text.side_effect = Exception("LLM Client Exception")
 
 
-        result = await generate_podcast_from_topic(topic)
+        result = await generate_podcast_from_topic(topic, duration_minutes=duration)
 
         mock_generate_text.assert_called_once()
         # The error message from podcast.py includes the original error.

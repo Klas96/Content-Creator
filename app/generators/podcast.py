@@ -13,14 +13,18 @@ async def generate_podcast_from_custom_text(text: str) -> str:
         return f"Test mode: Custom text received: {text}"
     return text
 
-async def generate_podcast_from_topic(topic: str) -> str:
-    """Generates podcast content based on a given topic."""
+async def generate_podcast_from_topic(topic: str, duration_minutes: int = 5) -> str:
+    """Generates a dialogue-based podcast script on a given topic for a specified duration."""
     if TEST_MODE:
-        return f"Test mode: Podcast for topic: {topic}"
+        return f"Test mode: Dialogue podcast for topic: '{topic}' for {duration_minutes} minutes."
 
-    prompt = f"""Human: You are a podcast scriptwriter. Generate an engaging and informative podcast script about the topic: {topic}. The script should be approximately 3-5 minutes in reading length. Structure it with a brief introduction, a main body discussing key aspects of the topic, and a short conclusion. Make it conversational.
+    prompt = f"""Human: You are a podcast scriptwriter. Generate an engaging and informative podcast script about the topic: "{topic}".
+The script should be a conversation between two distinct speakers (e.g., "Speaker A" and "Speaker B").
+Please clearly demarcate the lines for each speaker (e.g., "Speaker A: ...", "Speaker B: ...").
+The podcast should be approximately {duration_minutes} minutes in reading length.
+Structure it with a brief introduction, a main body discussing key aspects of the topic, and a short conclusion.
 
-Assistant: Here's a podcast script about {topic}:"""
+Assistant: Here's a dialogue-based podcast script about {topic} for {duration_minutes} minutes:"""
     try:
         # response = await asyncio.to_thread( # Replaced
         #     anthropic_client.completions.create,
@@ -81,8 +85,8 @@ if __name__ == '__main__':
         custom_text_output = await generate_podcast_from_custom_text("This is a test of the custom text podcast.")
         print(custom_text_output)
 
-        print("\n--- Topic-Based Podcast (e.g., 'The Future of AI') ---")
-        topic_output = await generate_podcast_from_topic("The Future of AI")
+        print("\n--- Topic-Based Podcast (e.g., 'The Future of AI', 7 minutes) ---")
+        topic_output = await generate_podcast_from_topic("The Future of AI", duration_minutes=7)
         print(topic_output)
 
         print("\n--- Freeform Podcast ---")

@@ -13,7 +13,7 @@ from pathlib import Path
 from .generators.story import generate_story
 from .generators.educational import generate_educational_content
 from .generators.image import generate_images
-from .generators.audio import generate_voice_over, generate_background_music
+from .generators.audio import generate_voice_over, generate_background_music, generate_dialogue_audio # Added generate_dialogue_audio
 from .generators.video import create_video_async
 from .generators.podcast import (
     generate_podcast_from_custom_text,
@@ -26,7 +26,10 @@ from .config import OUTPUT_DIR
 class PodcastGenerationOptions(BaseModel):
     podcast_type: Literal["custom_text", "topic_based", "free_generation"]
     custom_text: Optional[str] = None
-    topic: Optional[str] = None
+    topic: Optional[str] = None # General topic, can be used as fallback
+    conversation_topic: Optional[str] = None # Specific topic for dialogue podcasts
+    desired_duration_minutes: Optional[int] = 5 # Default to 5 minutes
+    speaker_voice_ids: Optional[List[str]] = None # For dialogue podcasts
 
 class ContentRequest(BaseModel):
     content_type: Literal["story", "educational", "podcast"]
@@ -328,12 +331,22 @@ async def process_content_generation(job_id: str, request: ContentRequest, outpu
                     raise ValueError("Custom text not provided for custom_text podcast type.")
                 podcast_script = await generate_podcast_from_custom_text(request.podcast_options.custom_text)
             elif request.podcast_options.podcast_type == "topic_based":
-                if not request.podcast_options.topic:
-                    # Fallback to main topic if podcast-specific topic is not provided
-                    # Though API design implies podcast_options.topic should be used if present.
-                    # For now, let's assume it *must* be present if type is topic_based.
-                    raise ValueError("Topic not provided for topic_based podcast type.")
-                podcast_script = await generate_podcast_from_topic(request.podcast_options.topic)
+                # Determine topic and duration for dialogue
+                actual_topic = request.podcast_options.conversation_topic or \
+                               request.podcast_options.topic or \
+                               request.topic # Fallback chain for topic
+
+                if not actual_topic:
+                    raise ValueError("A topic must be provided for 'topic_based' podcast generation (via conversation_topic, podcast_options.topic, or main request.topic).")
+
+                actual_duration = request.podcast_options.desired_duration_minutes
+                if actual_duration is None: # Should use Pydantic default, but as a safeguard
+                    actual_duration = 5
+
+                podcast_script = await generate_podcast_from_topic(
+                    topic=actual_topic,
+                    duration_minutes=actual_duration
+                )
             elif request.podcast_options.podcast_type == "free_generation":
                 podcast_script = await generate_free_podcast()
             else:
@@ -345,7 +358,34 @@ async def process_content_generation(job_id: str, request: ContentRequest, outpu
                     f.write(podcast_script)
 
                 voice_over_path = os.path.join(output_dir, "podcast_audio.mp3")
-                await generate_voice_over(podcast_script, voice_over_path)
+
+                # Dialogue generation if multiple speaker_voice_ids are provided for topic_based,
+                # or if a single speaker_voice_id is provided for any podcast type.
+                speaker_ids = request.podcast_options.speaker_voice_ids
+
+                if request.podcast_options.podcast_type == "topic_based" and speaker_ids and len(speaker_ids) > 0:
+                    # This is now the primary path for topic_based if speaker_ids are given
+                    if not actual_topic: # Should have been caught above, but for safety
+                         raise ValueError("Conversation topic is required for dialogue-based podcast.")
+                    print(f"Generating dialogue audio with voices: {speaker_ids}")
+                    await generate_dialogue_audio(
+                        script_text=podcast_script,
+                        speaker_voice_ids=speaker_ids, # Must be provided by user for now
+                        output_path=voice_over_path,
+                        temp_dir=os.path.join(output_dir, "audio_segments")
+                    )
+                elif speaker_ids and len(speaker_ids) == 1:
+                    # Any podcast type with a single specified voice ID
+                    print(f"Generating single voice-over with specified voice: {speaker_ids[0]}")
+                    await generate_voice_over(podcast_script, voice_over_path, voice_id=speaker_ids[0])
+                else:
+                    # Default behavior: custom_text, free_generation without specific voice,
+                    # or topic_based if no speaker_ids are provided (fallback to default single voice).
+                    if request.podcast_options.podcast_type == "topic_based" and (not speaker_ids or len(speaker_ids) == 0):
+                        print("Warning: 'topic_based' podcast initiated, but no 'speaker_voice_ids' provided or list is empty. Falling back to default single voice narration.")
+
+                    print("Generating standard single voice-over with default voice.")
+                    await generate_voice_over(podcast_script, voice_over_path) # Uses default voice in generate_voice_over
 
                 active_jobs[job_id]["status"] = "completed"
                 active_jobs[job_id]["completed_at"] = datetime.now().isoformat()
