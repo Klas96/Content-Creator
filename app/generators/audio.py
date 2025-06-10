@@ -3,6 +3,8 @@ import numpy as np
 from scipy.io import wavfile
 from elevenlabs import ElevenLabs
 from ..config import ELEVENLABS_KEY, TEST_MODE, ELEVENLABS_VOICES, DEFAULT_VOICE
+import asyncio
+from pydub import AudioSegment
 
 eleven_client = ElevenLabs(api_key=ELEVENLABS_KEY)
 
@@ -20,16 +22,7 @@ async def generate_voice_over(text: str, output_path: str, voice_name: str = Non
     Args:
         text (str): The text to convert to speech
         output_path (str): Where to save the audio file
-        voice_name (str, optional): Name of the voice to use. Must be one of:
-            - rachel (default): Professional female voice
-            - domi: Professional female voice
-            - bella: Professional female voice
-            - antoni: Professional male voice
-            - elli: Professional female voice
-            - josh: Professional male voice
-            - arnold: Professional male voice
-            - adam: Professional male voice
-            - sam: Professional male voice
+        voice_name (str, optional): Name of the voice to use
     """
     if TEST_MODE:
         audio, sample_rate = create_mock_audio(duration=10)  # 10 seconds of audio
@@ -56,6 +49,54 @@ async def generate_voice_over(text: str, output_path: str, voice_name: str = Non
     # Save the audio
     with open(output_path, 'wb') as f:
         f.write(audio_data)
+
+async def generate_dialogue(dialogues: list, output_path: str, voice1: str = "rachel", voice2: str = "josh"):
+    """
+    Generate a dialogue between two speakers.
+    
+    Args:
+        dialogues (list): List of tuples containing (speaker_number, text)
+            speaker_number should be 1 or 2
+        output_path (str): Where to save the final audio file
+        voice1 (str): Voice to use for speaker 1
+        voice2 (str): Voice to use for speaker 2
+    """
+    if TEST_MODE:
+        audio, sample_rate = create_mock_audio(duration=len(dialogues) * 5)  # 5 seconds per dialogue
+        wavfile.write(output_path, sample_rate, audio)
+        return
+
+    # Create temporary directory for individual audio files
+    temp_dir = os.path.join(os.path.dirname(output_path), "temp_audio")
+    os.makedirs(temp_dir, exist_ok=True)
+
+    try:
+        # Generate individual audio files for each dialogue
+        audio_files = []
+        for i, (speaker, text) in enumerate(dialogues):
+            temp_path = os.path.join(temp_dir, f"dialogue_{i}.mp3")
+            voice = voice1 if speaker == 1 else voice2
+            await generate_voice_over(text, temp_path, voice)
+            audio_files.append(temp_path)
+
+        # Combine all audio files with a small pause between them
+        combined = AudioSegment.empty()
+        pause = AudioSegment.silent(duration=500)  # 500ms pause between speakers
+
+        for audio_file in audio_files:
+            segment = AudioSegment.from_mp3(audio_file)
+            combined += segment + pause
+
+        # Export the final audio
+        combined.export(output_path, format="mp3")
+
+    finally:
+        # Clean up temporary files
+        for file in audio_files:
+            if os.path.exists(file):
+                os.remove(file)
+        if os.path.exists(temp_dir):
+            os.rmdir(temp_dir)
 
 async def generate_background_music(duration: int, output_path: str):
     """Generate background music."""

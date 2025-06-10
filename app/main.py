@@ -6,19 +6,20 @@ import os
 from datetime import datetime, timedelta
 import uuid
 from pydantic import BaseModel
-from typing import Optional, Literal, List
+from typing import Optional, Literal, List, Tuple
 import shutil
 from pathlib import Path
 
 from .generators.story import generate_story
 from .generators.educational import generate_educational_content
 from .generators.image import generate_images
-from .generators.audio import generate_voice_over, generate_background_music
+from .generators.audio import generate_voice_over, generate_background_music, generate_dialogue
 from .generators.video import create_video_async
 from .generators.podcast import (
     generate_podcast_from_custom_text,
     generate_podcast_from_topic,
     generate_free_podcast,
+    generate_dialogue_content
 )
 from .generators.article import generate_article
 from .generators.social import generate_tweet_thread
@@ -27,10 +28,18 @@ import json # For saving tweet_thread output
 from .config import OUTPUT_DIR
 
 # Define request models
+class DialogueEntry(BaseModel):
+    speaker: int  # 1 or 2
+    text: str
+
 class PodcastGenerationOptions(BaseModel):
-    podcast_type: Literal["custom_text", "topic_based", "free_generation"]
+    podcast_type: Literal["custom_text", "topic_based", "free_generation", "dialogue"]
     custom_text: Optional[str] = None
     topic: Optional[str] = None
+    dialogues: Optional[List[DialogueEntry]] = None
+    voice1: Optional[str] = "rachel"  # Default female voice
+    voice2: Optional[str] = "josh"    # Default male voice
+    num_exchanges: Optional[int] = Query(default=6, ge=2, le=20)  # Number of dialogue exchanges to generate
 
 class ArticleOptions(BaseModel):
     custom_instructions: Optional[str] = None
@@ -350,39 +359,61 @@ async def process_content_generation(job_id: str, request: ContentRequest, outpu
             if not request.podcast_options:
                 raise ValueError("Podcast options not provided for podcast content type.")
 
-            podcast_script = None
-            if request.podcast_options.podcast_type == "custom_text":
-                if not request.podcast_options.custom_text:
-                    raise ValueError("Custom text not provided for custom_text podcast type.")
-                podcast_script = await generate_podcast_from_custom_text(request.podcast_options.custom_text)
-            elif request.podcast_options.podcast_type == "topic_based":
-                if not request.podcast_options.topic: # This uses the podcast_options.topic
-                    raise ValueError("Topic not provided for topic_based podcast type.")
-                podcast_script = await generate_podcast_from_topic(request.podcast_options.topic)
-            elif request.podcast_options.podcast_type == "free_generation":
-                podcast_script = await generate_free_podcast()
+            if request.podcast_options.podcast_type == "dialogue":
+                # Generate dialogue content if not provided
+                if not request.podcast_options.dialogues:
+                    if not request.topic:
+                        raise HTTPException(status_code=400, detail="Topic is required for automatic dialogue generation")
+                    
+                    # Generate dialogue content
+                    dialogue_list = await generate_dialogue_content(
+                        topic=request.topic,
+                        num_exchanges=request.podcast_options.num_exchanges
+                    )
+                else:
+                    # Use provided dialogues
+                    dialogue_list = [(d.speaker, d.text) for d in request.podcast_options.dialogues]
+                
+                # Generate dialogue audio
+                output_filename = "podcast_audio.mp3"
+                output_path = os.path.join(output_dir, output_filename)
+                await generate_dialogue(
+                    dialogues=dialogue_list,
+                    output_path=output_path,
+                    voice1=request.podcast_options.voice1,
+                    voice2=request.podcast_options.voice2
+                )
+                
+                # Update job info
+                active_jobs[job_id].update({
+                    "status": "completed",
+                    "output_filename": output_filename,
+                    "media_type": "audio/mpeg"
+                })
             else:
-                raise ValueError(f"Invalid podcast type: {request.podcast_options.podcast_type}")
-
-            if not podcast_script or podcast_script.startswith("Error:"):
-                raise ValueError(f"Podcast script generation failed: {podcast_script}")
-
-            script_path = os.path.join(output_dir, "podcast_script.txt")
-            with open(script_path, 'w') as f:
-                f.write(podcast_script)
-
-            output_filename = "podcast_audio.mp3" # Main output for podcast
-            media_type = "audio/mpeg"
-            voice_over_path = os.path.join(output_dir, output_filename)
-            await generate_voice_over(podcast_script, voice_over_path)
-
-            audio_file_to_copy = f"{job_id}.mp3"
-            public_audio_path = os.path.join("static/audios", audio_file_to_copy)
-            shutil.copy2(voice_over_path, public_audio_path)
-            active_jobs[job_id]["audio_url"] = f"/static/audios/{audio_file_to_copy}"
-            # Store info for download endpoint
-            active_jobs[job_id]["output_filename"] = output_filename
-            active_jobs[job_id]["media_type"] = media_type
+                # Handle other podcast types as before
+                if request.podcast_options.podcast_type == "custom_text":
+                    text = request.podcast_options.custom_text
+                elif request.podcast_options.podcast_type == "topic_based":
+                    text = await generate_podcast_from_topic(request.topic)
+                else:  # free_generation
+                    text = await generate_free_podcast()
+                
+                # Generate voice over
+                output_filename = "podcast_audio.mp3"
+                output_path = os.path.join(output_dir, output_filename)
+                await generate_voice_over(
+                    text=text,
+                    output_path=output_path,
+                    voice_name=request.voice_name
+                )
+                
+                # Update job info
+                active_jobs[job_id].update({
+                    "status": "completed",
+                    "output_filename": output_filename,
+                    "media_type": "audio/mpeg"
+                })
 
         elif request.content_type == "article":
             text_content_only = True

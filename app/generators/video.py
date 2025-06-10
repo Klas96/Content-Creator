@@ -1,12 +1,13 @@
 from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
 from moviepy.audio.io.AudioFileClip import AudioFileClip
 from moviepy.audio.AudioClip import CompositeAudioClip, AudioClip
+from moviepy.video.VideoClip import TextClip #CompositeVideoClip
 import numpy as np
 import os
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
-def create_video(image_paths, voice_over_path, background_music_path, output_path, video_prompt=None, content_type=None, fps=1):
+def create_video(image_paths, voice_over_path, background_music_path, output_path, video_prompt=None, content_type=None, fps=1, dialogues=None):
     """
     Create a video from images, voice-over, and background music.
     
@@ -18,6 +19,7 @@ def create_video(image_paths, voice_over_path, background_music_path, output_pat
         video_prompt (str, optional): Custom instructions for video generation
         content_type (str, optional): Type of content ("story" or "educational")
         fps (int, optional): Frames per second. Defaults to 1.
+        dialogues (list, optional): List of tuples containing (speaker_number, text) for dialogue visualization
     """
     # Verify all input files exist
     for path in [voice_over_path, background_music_path] + image_paths:
@@ -59,6 +61,40 @@ def create_video(image_paths, voice_over_path, background_music_path, output_pat
         # Combine audio tracks
         final_audio = CompositeAudioClip([voice_audio, music_audio])
         
+        # If we have dialogues, create text overlays
+        if dialogues:
+            # Calculate timing for each dialogue segment
+            total_duration = voice_over.duration
+            segment_duration = total_duration / len(dialogues)
+            
+            # Create text clips for each dialogue
+            text_clips = []
+            for i, (speaker, text) in enumerate(dialogues):
+                # Create text clip with speaker indicator
+                speaker_text = f"Speaker {speaker}: {text}"
+                txt_clip = TextClip(
+                    speaker_text,
+                    fontsize=24,
+                    color='white',
+                    bg_color='black',
+                    font='Arial',
+                    size=(clip.w * 0.8, None),
+                    method='caption'
+                )
+                
+                # Position the text at the bottom of the screen
+                txt_clip = txt_clip.set_position(('center', 'bottom'))
+                
+                # Set the timing for this text clip
+                start_time = i * segment_duration
+                end_time = (i + 1) * segment_duration
+                txt_clip = txt_clip.set_start(start_time).set_end(end_time)
+                
+                text_clips.append(txt_clip)
+            
+            # Combine the video with text overlays
+            clip = CompositeVideoClip([clip] + text_clips)
+        
         # Set the audio of the video
         clip = clip.with_audio(final_audio)
         
@@ -79,7 +115,7 @@ def create_video(image_paths, voice_over_path, background_music_path, output_pat
         if 'clip' in locals():
             clip.close()
 
-async def create_video_async(image_paths, voice_over_path, background_music_path, output_path, video_prompt=None, content_type=None, fps=1):
+async def create_video_async(image_paths, voice_over_path, background_music_path, output_path, video_prompt=None, content_type=None, fps=1, dialogues=None):
     """
     Asynchronous wrapper for create_video function.
     """
@@ -94,5 +130,6 @@ async def create_video_async(image_paths, voice_over_path, background_music_path
             output_path,
             video_prompt,
             content_type,
-            fps
+            fps,
+            dialogues
         )
