@@ -60,6 +60,7 @@ class ContentRequest(BaseModel):
 
     # Podcast specific
     podcast_options: Optional[PodcastGenerationOptions] = None
+    voice_name: Optional[str] = None  # Name of the ElevenLabs voice to use
 
     # New text-specific options
     article_options: Optional[ArticleOptions] = None

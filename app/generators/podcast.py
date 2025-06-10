@@ -18,9 +18,14 @@ async def generate_podcast_from_topic(topic: str) -> str:
     if TEST_MODE:
         return f"Test mode: Podcast for topic: {topic}"
 
-    prompt = f"""Human: You are a podcast scriptwriter. Generate an engaging and informative podcast script about the topic: {topic}. The script should be approximately 3-5 minutes in reading length. Structure it with a brief introduction, a main body discussing key aspects of the topic, and a short conclusion. Make it conversational.
+    prompt = f"""Create a natural, engaging podcast script about {topic}. 
+    Write it as a single, flowing narrative without any labels or formatting.
+    The script should be approximately 3-5 minutes in reading length.
+    Start with a brief introduction, then dive into the main content, and end with a conclusion.
+    Make it conversational and engaging, as if you're speaking directly to the listener.
+    Do not include any labels like 'Host:', 'Introduction:', or 'Conclusion:'.
+    Just write the natural flow of the conversation."""
 
-Assistant: Here's a podcast script about {topic}:"""
     try:
         # response = await asyncio.to_thread( # Replaced
         #     anthropic_client.completions.create,
@@ -47,9 +52,13 @@ async def generate_free_podcast() -> str:
     if TEST_MODE:
         return "Test mode: Freeform podcast generated."
 
-    prompt = """Human: You are a creative podcast scriptwriter. Generate an engaging podcast script on any interesting topic of your choice. The script should be suitable for a general audience, approximately 3-5 minutes in reading length, and have a clear narrative or informational flow. Surprise me with your creativity!
+    prompt = """Create a natural, engaging podcast script on any interesting topic of your choice.
+    Write it as a single, flowing narrative without any labels or formatting.
+    The script should be suitable for a general audience and approximately 3-5 minutes in reading length.
+    Make it conversational and engaging, as if you're speaking directly to the listener.
+    Do not include any labels like 'Host:', 'Introduction:', or 'Conclusion:'.
+    Just write the natural flow of the conversation."""
 
-Assistant: Here's a podcast script on an interesting topic:"""
     try:
         # response = await asyncio.to_thread( # Replaced
         #     anthropic_client.completions.create,

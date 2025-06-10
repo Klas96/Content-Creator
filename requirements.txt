@@ -6,6 +6,7 @@ fastapi==0.109.2
 uvicorn==0.27.1
 python-multipart==0.0.9
 anthropic==0.7.4
+openai==1.12.0
 httpx==0.24.1
 numpy==1.26.4
 scipy==1.12.0

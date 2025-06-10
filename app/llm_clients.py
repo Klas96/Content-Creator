@@ -3,12 +3,17 @@ import json
 import asyncio # Added for potential direct anthropic call if not using to_thread
 from app.config import OLLAMA_API_BASE_URL, OLLAMA_MODEL_NAME, ANTHROPIC_KEY, LLM_PROVIDER
 from anthropic import Anthropic
+from openai import AsyncOpenAI
+from .config import (
+    OPENAI_KEY,
+    OPENAI_MODEL,
+    OPENAI_TEMPERATURE,
+    OPENAI_MAX_TOKENS
+)
 
-# Initialize Anthropic client (if ANTHROPIC_KEY is available)
-if ANTHROPIC_KEY:
-    anthropic_client = Anthropic(api_key=ANTHROPIC_KEY)
-else:
-    anthropic_client = None # Or handle this case more gracefully depending on requirements
+# Initialize clients
+openai_client = AsyncOpenAI(api_key=OPENAI_KEY) if OPENAI_KEY else None
+anthropic_client = Anthropic(api_key=ANTHROPIC_KEY) if ANTHROPIC_KEY else None
 
 # Define a timeout for HTTP requests (e.g., 60 seconds)
 DEFAULT_TIMEOUT = 60.0
@@ -67,42 +72,62 @@ async def generate_ollama_completion(prompt: str, model: str = None, temperature
         print(error_message)
         return "Error: Invalid JSON response from Ollama."
 
-async def generate_text_completion(prompt: str, temperature: float = 0.7, max_tokens: int = 2000) -> str:
+async def generate_text_completion(
+    prompt: str,
+    temperature: float = 0.7,
+    max_tokens: int = 2000,
+    system_prompt: str = None
+) -> str:
     """
-    Generates a text completion using the configured LLM provider.
+    Generate text completion using the configured LLM provider.
+    
+    Args:
+        prompt (str): The main prompt for content generation
+        temperature (float): Controls randomness in the output
+        max_tokens (int): Maximum number of tokens to generate
+        system_prompt (str, optional): System prompt to guide the model's behavior
+    
+    Returns:
+        str: Generated text or error message
     """
-    if LLM_PROVIDER == "ollama":
-        # Note: max_tokens isn't directly passed to generate_ollama_completion's current payload. # This comment is now less relevant
-        # Ollama's /api/generate might have a 'num_predict' in options, but it's not standard for all models. # This comment is now less relevant
-        # This could be a future enhancement for the Ollama client. # This comment is now less relevant
-        try:
-            return await generate_ollama_completion(prompt, temperature=temperature, num_predict=max_tokens)
-        except Exception as e:
-            # Log or handle specific errors from Ollama client if needed
-            print(f"Error during Ollama completion: {e}")
-            return f"Error: Ollama generation failed. Reason: {e}"
+    try:
+        if LLM_PROVIDER == "openai":
+            if not openai_client:
+                return "Error: OpenAI client not initialized. Check your API key."
+            
+            messages = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "user", "content": prompt})
 
-    elif LLM_PROVIDER == "anthropic":
-        if not anthropic_client:
-            return "Error: Anthropic client not initialized. Check ANTHROPIC_KEY."
-        try:
-            # Consider using asyncio.to_thread for blocking I/O if not already handled by the library
-            # For httpx based libraries like new Anthropic SDK, it's usually async native.
-            # The current anthropic SDK (0.7.4 as per requirements) uses httpx and is async friendly.
-            completion_obj = await asyncio.to_thread( # Using to_thread for safety with older SDKs or if unsure.
-                anthropic_client.completions.create,
-                prompt=prompt,
-                model="claude-2", # As specified
+            response = await openai_client.chat.completions.create(
+                model=OPENAI_MODEL,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens
+            )
+            return response.choices[0].message.content.strip()
+
+        elif LLM_PROVIDER == "anthropic":
+            if not anthropic_client:
+                return "Error: Anthropic client not initialized. Check your API key."
+            
+            full_prompt = f"{system_prompt}\n\n" if system_prompt else ""
+            full_prompt += f"Human: {prompt}\n\nAssistant:"
+            
+            response = await anthropic_client.completions.create(
+                prompt=full_prompt,
+                model="claude-2",
                 max_tokens_to_sample=max_tokens,
                 temperature=temperature
             )
-            return completion_obj.completion.strip()
-        except Exception as e:
-            print(f"Error during Anthropic completion: {e}")
-            return f"Error: Anthropic generation failed. Reason: {e}"
-    else:
-        print(f"Error: Unknown LLM_PROVIDER configured: {LLM_PROVIDER}")
-        return "Error: Unknown LLM provider configured."
+            return response.completion.strip()
+
+        else:
+            return f"Error: Unknown LLM provider '{LLM_PROVIDER}'. Supported providers are 'openai' and 'anthropic'."
+
+    except Exception as e:
+        return f"Error: {str(e)}"
 
 # Example usage (optional, for direct testing of this file)
 if __name__ == "__main__":
