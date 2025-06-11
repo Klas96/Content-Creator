@@ -95,7 +95,13 @@ async def generate_platformer_game(theme: str) -> str:
             "collectible": f"pixel art coin, {theme} theme"
         }
         for asset_key, img_prompt_text in image_gen_prompts.items():
-            await generate_images(prompt=img_prompt_text, output_dir=str(game_output_path), filename=asset_names[asset_key])
+            await generate_images(
+                prompt=img_prompt_text,
+                topic=theme,
+                output_dir=str(game_output_path),
+                filename=asset_names[asset_key],
+                content_type="story"
+            )
 
         # 5. Prepare Data for Processing.js Code Prompt
         processing_prompt_data = {

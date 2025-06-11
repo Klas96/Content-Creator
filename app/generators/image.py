@@ -13,16 +13,17 @@ def create_mock_image(width=512, height=512, color=(100, 100, 200), text="Test I
     return img
 
 async def generate_images(
-    content: str,
+    prompt: str,
     topic: str,
     output_dir: str,
-    content_type: str = "story"
+    content_type: str = "story",
+    filename: str = "image.png"
 ) -> list[str]:
-    """Generate images for the content."""
+    """Generate images for the prompt."""
     image_paths = []
     
     # Generate main image
-    main_image_path = os.path.join(output_dir, "main.jpg")
+    main_image_path = os.path.join(output_dir, filename)
     if content_type == "story":
         prompt = f"Portrait of {topic}, high quality digital art, detailed, professional photography"
     else:
@@ -32,9 +33,9 @@ async def generate_images(
     image_paths.append(main_image_path)
     
     # Generate content-specific images
-    paragraphs = content.split('\n\n')
+    paragraphs = prompt.split('\n\n')
     for i, paragraph in enumerate(paragraphs):
-        scene_image_path = os.path.join(output_dir, f"scene_{i+1}.jpg")
+        scene_image_path = os.path.join(output_dir, f"scene_{i+1}.png")
         if content_type == "story":
             prompt = f"Scene from the story: {paragraph[:200]}, cinematic, high quality digital art"
         else:

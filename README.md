@@ -153,4 +153,45 @@ kill PID
 2. Or use a different port:
 ```bash
 uvicorn app.main:app --reload --port 8001
-``` 
+```
+
+## Platformer Game Endpoints
+
+### 1. Start Game Generation
+Start a new game generation job with a custom theme.
+
+**Request:**
+```sh
+curl -X POST "http://localhost:8000/games/" -H "Content-Type: application/json" -d '{"theme": "Space Adventure"}'
+```
+**Response:**
+```json
+{"job_id": "<your-job-id>"}
+```
+
+### 2. Check Job Status
+Check the status of your game generation job.
+
+**Request:**
+```sh
+curl "http://localhost:8000/games/<your-job-id>/status"
+```
+**Response:**
+```json
+{"status": "pending", "error": null}
+```
+
+### 3. Download the Game
+Once the job status is `done`, download the generated game as a zip file.
+
+**Request:**
+```sh
+curl -O "http://localhost:8000/games/<your-job-id>/download"
+```
+
+## Notes for Developers
+- The `generate_images` function in `platformer_game.py` requires a `content` argument. If you only want to generate the main asset image, pass `content=""`.
+- All generated games and their zip files are saved in the output directory specified by `OUTPUT_DIR` in your config.
+
+## Contributing
+Feel free to open issues or submit pull requests for improvements or new features. 

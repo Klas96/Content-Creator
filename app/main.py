@@ -26,6 +26,7 @@ from .generators.social import generate_tweet_thread
 from .generators.book import generate_book_chapter
 import json # For saving tweet_thread output
 from .config import OUTPUT_DIR
+from app.api import games
 
 # Define request models
 class DialogueEntry(BaseModel):
@@ -115,6 +116,8 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 os.makedirs("static/videos", exist_ok=True)
 os.makedirs("static/thumbnails", exist_ok=True)
 os.makedirs("static/audios", exist_ok=True)
+
+app.include_router(games.router)
 
 @app.get("/")
 async def root():
