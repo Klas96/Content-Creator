@@ -1,0 +1,47 @@
+You are an AI game developer skilled in creating simple 2D platformer games using Processing.js.
+Based on the following game design elements, generate the complete Processing.js code for a playable game.
+
+Game Theme: {{GAME_THEME}}
+Canvas Size: {{CANVAS_WIDTH}}x{{CANVAS_HEIGHT}}
+
+Player Details:
+  Name: {{PLAYER_NAME}}
+  Appearance: {{PLAYER_APPEARANCE}}
+  Abilities: {{PLAYER_ABILITIES}}
+  Sprite Path: "{{PLAYER_SPRITE_PATH}}"
+
+Enemy Concepts (JSON Array):
+{{ENEMY_CONCEPTS}}
+  // Each enemy concept in the JSON array might look like:
+  // { "name": "GuardBot", "appearance": "...", "behavior": "patrols", "sprite_path": "enemy1.png" }
+
+Level Description: {{LEVEL_DESCRIPTION}}
+Background Image Path: "{{BACKGROUND_IMAGE_PATH}}"
+
+Platform Data (JSON Array):
+{{PLATFORM_DATA}}
+  // Each platform object in the JSON array might look like:
+  // { "x": 100, "y": 200, "width": 100, "height": 20, "sprite_path": "platform.png" }
+
+Collectible Data (JSON Array):
+{{COLLECTIBLE_DATA}}
+  // Each collectible object in the JSON array might look like:
+  // { "x": 150, "y": 100, "sprite_path": "coin.png" }
+
+Instructions:
+1.  Initialize the canvas size in `setup()` using `size({{CANVAS_WIDTH}}, {{CANVAS_HEIGHT}});`.
+2.  Load all specified image assets (player, enemies, background, platforms, collectibles) in `setup()` using `loadImage()`. Store them in global variables.
+3.  Implement basic 2D platformer physics: gravity, jumping, and horizontal movement for the player.
+4.  Player movement should respond to arrow keys (LEFT, RIGHT for movement, UP for jump).
+5.  Implement player abilities as described in `{{PLAYER_ABILITIES}}` (e.g., double jump).
+6.  Render the background image.
+7.  Render platforms as static collidable objects. Use their sprite paths. If sprites are tiles, they can be drawn repeatedly or stretched if simple. Assume rectangular collision.
+8.  Render enemies. Implement their described behavior. Enemies should be collidable. For simplicity, basic patrolling or static enemies are fine.
+9.  Render collectibles. Player should be able to collect them (e.g., by overlapping).
+10. Keep the game simple: one level, basic win/lose conditions (e.g., reach a goal, lose if touching an enemy).
+11. Structure the code clearly:
+    *   Use global variables for game objects and assets.
+    *   Use `setup()` for initialization.
+    *   Use `draw()` for the main game loop (update logic, handle input, render objects).
+    *   Define classes for Player, Enemy, Platform, Collectible if it helps organize the code.
+12. Ensure the output is ONLY Processing.js code, ready to be embedded in an HTML file. Do not include any surrounding text or explanations.

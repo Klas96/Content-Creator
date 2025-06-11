@@ -1,0 +1,31 @@
+You are an AI game designer. Generate the core design elements for a 2D platformer game based on the theme: {theme}.
+
+Provide the following details:
+
+1.  **Character Concept:**
+    *   Name:
+    *   Appearance:
+    *   Abilities (e.g., jump, double jump, special attack):
+
+2.  **Level Ideas (at least 3):**
+    *   Level 1 (Name/Setting):
+        *   Description:
+        *   Key platforming challenges:
+        *   Enemies (if any):
+        *   Objective:
+    *   Level 2 (Name/Setting):
+        *   Description:
+        *   Key platforming challenges:
+        *   Enemies (if any):
+        *   Objective:
+    *   Level 3 (Name/Setting):
+        *   Description:
+        *   Key platforming challenges:
+        *   Enemies (if any):
+        *   Objective:
+
+3.  **Overall Game Objective/Goal:**
+
+4.  **Potential Power-ups or Collectibles:**
+
+Keep the descriptions concise and suitable for a 2D platformer game.

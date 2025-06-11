@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Generated Platformer Game</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/processing.js/1.6.6/processing.min.js"></script>
+    <style>
+        body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f0f0f0; }
+        canvas { border: 1px solid black; }
+    </style>
+</head>
+<body>
+    <canvas id="gamecanvas"></canvas>
+    <script type="text/processing" data-processing-target="gamecanvas">
+    // --- PROCESSING.JS CODE WILL BE INSERTED HERE BY THE GENERATOR ---
+
+    // Global variables (LLM can add more here)
+    // Example: PImage playerSprite;
+    // Example: String gameTheme = "{{GAME_THEME}}";
+
+    void setup() {
+        size({{CANVAS_WIDTH}}, {{CANVAS_HEIGHT}});
+        // --- BEGIN PRELOAD ASSETS ---
+        // LLM: Add image loading here, e.g.:
+        // playerSprite = loadImage("{{PLAYER_SPRITE_PATH}}");
+        // --- END PRELOAD ASSETS ---
+
+        // --- BEGIN INITIALIZE GAME STATE ---
+        // LLM: Initialize game variables, player, enemies, level, etc.
+        // --- END INITIALIZE GAME STATE ---
+    }
+
+    void draw() {
+        background(200); // Default background
+        // --- BEGIN GAME LOGIC AND RENDERING ---
+        // LLM: Implement game loop:
+        // - Update game state (player movement, enemy AI, physics).
+        // - Handle input.
+        // - Render game objects (player, enemies, platforms, background).
+        // - Check for win/lose conditions.
+        // --- END GAME LOGIC AND RENDERING ---
+    }
+
+    // --- BEGIN HELPER FUNCTIONS AND CLASSES ---
+    // LLM: Define any necessary functions or classes for player, enemies, platforms, etc.
+    // Example:
+    // class Player {
+    //   float x, y;
+    //   PImage sprite;
+    //   Player(float x, float y, PImage sprite) { this.x = x; this.y = y; this.sprite = sprite; }
+    //   void display() { image(sprite, x, y); }
+    //   void update() { /* movement logic */ }
+    // }
+    // --- END HELPER FUNCTIONS AND CLASSES ---
+
+    // --- END PROCESSING.JS CODE ---
+    </script>
+</body>
+</html>
