@@ -8,7 +8,7 @@ from app.config import LLM_PROVIDER, OUTPUT_DIR
 from app.utils.prompt_loader import load_prompt
 from app.generators.openai_content import generate_story_openai
 from app.generators.anthropic_content import generate_story_anthropic
-from app.generators.image import generate_images
+from app.generators.image import generate_image # Changed from generate_images to generate_image
 
 # Constants for game generation
 DEFAULT_CANVAS_WIDTH = 800
@@ -17,19 +17,19 @@ PROCESSING_GAME_TEMPLATE_PATH = "templates/processing_js_template/processing_gam
 CONCEPT_PROMPT_FILE = "platformer_game_prompt.txt" # For initial game design
 PROCESSING_CODE_PROMPT_FILE = "processing_game_code_prompt.txt" # For Processing.js code
 
-async def generate_platformer_game(theme: str) -> str:
+async def generate_platformer_game(theme: str, job_id: str) -> str:
     """
     Generates a complete HTML file with embedded Processing.js game code
-    based on the provided theme.
+    based on the provided theme and job_id.
     """
-    game_output_dir_name = theme.replace(" ", "_").replace("-", "_").lower()
-    # Ensure game_output_dir_name is a valid directory name (e.g. no special chars beyond _-)
-    game_output_dir_name = "".join(c if c.isalnum() or c in ['_', '-'] else '_' for c in game_output_dir_name)
-    game_output_path = Path(OUTPUT_DIR) / "processing_games" / game_output_dir_name
+    # Use job_id for the main output directory
+    game_output_path = Path(OUTPUT_DIR) / job_id
+    assets_output_path = game_output_path / "assets" # Specific subdirectory for assets
 
     try:
-        # 0. Create output directory
+        # 0. Create output directories
         game_output_path.mkdir(parents=True, exist_ok=True)
+        assets_output_path.mkdir(parents=True, exist_ok=True)
 
         # 1. Load HTML Template
         try:
@@ -86,24 +86,29 @@ async def generate_platformer_game(theme: str) -> str:
             "player": "player.png", "enemy1": "enemy1.png", "platform": "platform.png",
             "background": "background.png", "collectible": "coin.png"
         }
-        asset_paths_in_code = {key: name for key, name in asset_names.items()}
+        # Paths in code should now reflect the "assets/" subdirectory
+        asset_paths_in_code = {key: f"assets/{name}" for key, name in asset_names.items()}
 
-        # 4. Generate Image Assets
+        # 4. Generate Image Assets (save to assets_output_path)
         image_gen_prompts = {
-            "player": f"pixel art main character, {theme} theme", "enemy1": f"pixel art enemy, {theme} theme",
-            "platform": f"pixel art platform tile, {theme} theme", "background": f"pixel art background, {theme} theme, side-scrolling",
-            "collectible": f"pixel art coin, {theme} theme"
+            "player": f"pixel art style, main player character for a 2D platformer game with a '{theme}' theme",
+            "enemy1": f"pixel art style, common enemy for a 2D platformer game with a '{theme}' theme",
+            "platform": f"pixel art style, basic platform tile or ground block for a 2D platformer game with a '{theme}' theme",
+            "background": f"pixel art style, parallax background for a 2D platformer game with a '{theme}' theme, side-scrolling view",
+            "collectible": f"pixel art style, collectible item (e.g., coin, gem, or fruit) for a 2D platformer game with a '{theme}' theme"
         }
         for asset_key, img_prompt_text in image_gen_prompts.items():
-            await generate_images(prompt=img_prompt_text, output_dir=str(game_output_path), filename=asset_names[asset_key])
+            # Use assets_output_path for saving images and generate_image (singular)
+            output_image_file_path = assets_output_path / asset_names[asset_key]
+            await generate_image(prompt=img_prompt_text, output_path=str(output_image_file_path))
 
         # 5. Prepare Data for Processing.js Code Prompt
         processing_prompt_data = {
             "GAME_THEME": theme, "PLAYER_NAME": player_name, "PLAYER_APPEARANCE": f"Hero of {theme}", # Appearance not parsed yet
-            "PLAYER_ABILITIES": player_abilities, "PLAYER_SPRITE_PATH": asset_paths_in_code["player"],
+            "PLAYER_ABILITIES": player_abilities, "PLAYER_SPRITE_PATH": asset_paths_in_code["player"], # e.g., "assets/player.png"
             "ENEMY_CONCEPTS": json.dumps([{"name": "Generic Enemy", "appearance": f"Enemy from {theme}", "behavior": "patrols", "sprite_path": asset_paths_in_code["enemy1"]}]),
             "LEVEL_DESCRIPTION": level_description, "CANVAS_WIDTH": canvas_width, "CANVAS_HEIGHT": canvas_height,
-            "BACKGROUND_IMAGE_PATH": asset_paths_in_code["background"],
+            "BACKGROUND_IMAGE_PATH": asset_paths_in_code["background"], # e.g., "assets/background.png"
             "PLATFORM_DATA": json.dumps([
                 {"x": canvas_width / 2, "y": canvas_height - 20, "width": canvas_width, "height": 20, "sprite_path": asset_paths_in_code["platform"]},
                 {"x": 200, "y": canvas_height - 150, "width": 150, "height": 20, "sprite_path": asset_paths_in_code["platform"]},

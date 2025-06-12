@@ -99,6 +99,48 @@ GET /download/{job_id}
 GET /podcast/{job_id}/info
 ```
 
+5. Generate a 2D Platformer Game (Processing.js HTML):
+```bash
+GET /generate_platformer_game/?theme=YourGameTheme
+```
+   - **Description:** Generates a playable 2D platformer game as an HTML file with embedded Processing.js code, based on a given theme.
+   - **Parameters:**
+     - `theme` (query parameter, string, required): The theme for the game (e.g., "Jungle Adventure", "Cyberpunk City", "Haunted Mansion").
+   - **Output:**
+     - The direct response is an HTML page containing the game.
+     - The generated game (an `index.html` file and an `assets/` folder containing images like `player.png`, `enemy1.png`, etc.) will be saved in a unique directory under `output/`, named with a unique Job ID (e.g., `output/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/`). You can run the game by opening the `index.html` file from this directory in your web browser.
+     - We are continuously working on improving image asset uniqueness and the direct runnability of the generated Processing.js code.
+   - **Example Curl Request:**
+     ```bash
+     curl -X GET "http://127.0.0.1:8000/generate_platformer_game/?theme=MysticForest" -H "accept: text/html" -o MysticForestGame.html
+     ```
+     (This saves the game HTML to `MysticForestGame.html`. You can then open this file in a browser.)
+   - **Example Python Request:**
+     ```python
+     import requests
+     import os
+     import webbrowser
+
+     theme = "CosmicVoid"
+     response = requests.get(f"http://127.0.0.1:8000/generate_platformer_game/?theme={theme}")
+
+     if response.status_code == 200:
+         # The response content is the HTML game itself.
+         # For saving and running, you'd typically get the Job ID from logs or another way
+         # if you want to find the saved files, but the response IS the game.
+         game_html_content = response.text
+         # Save to a temporary file to open in browser
+         temp_file_path = "temp_game.html"
+         with open(temp_file_path, "w", encoding="utf-8") as f:
+             f.write(game_html_content)
+
+         print(f"Game HTML received. Opening {temp_file_path} in browser.")
+         webbrowser.open(f"file://{os.path.realpath(temp_file_path)}")
+         # Note: Saved files on server are in output/[job_id]/
+     else:
+         print(f"Error: {response.status_code} - {response.text}")
+     ```
+
 ### Output Structure
 
 The generated content is organized in the following structure:

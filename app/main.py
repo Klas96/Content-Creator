@@ -24,6 +24,7 @@ from .generators.podcast import (
 from .generators.article import generate_article
 from .generators.social import generate_tweet_thread
 from .generators.book import generate_book_chapter
+from .generators.platformer_game import generate_platformer_game # Ensure this import is present
 import json # For saving tweet_thread output
 from .config import OUTPUT_DIR
 
@@ -527,6 +528,25 @@ async def process_content_generation(job_id: str, request: ContentRequest, outpu
         active_jobs[job_id]["status"] = "failed"
         active_jobs[job_id]["error"] = str(e)
         active_jobs[job_id]["failed_at"] = datetime.now().isoformat()
+
+
+@app.get("/generate_platformer_game/", response_class=HTMLResponse)
+async def generate_platformer_game_endpoint(theme: str = Query(..., title="Game Theme", description="The theme for the platformer game.")):
+    job_id = str(uuid.uuid4()) # Generate a unique job ID
+    try:
+        html_content = await generate_platformer_game(theme=theme, job_id=job_id)
+        # The HTML content is returned, the actual files are saved by the generator
+        # based on job_id.
+        return HTMLResponse(content=html_content, status_code=200)
+    except FileNotFoundError as e:
+        # This specific error handling might be less relevant if templates are bundled
+        # or if path issues are resolved, but good for now.
+        raise HTTPException(status_code=500, detail=f"A required file was not found: {e}")
+    except Exception as e:
+        # Log the exception here if logging is set up
+        # import traceback; traceback.print_exc(); # for debugging if needed
+        raise HTTPException(status_code=500, detail=f"An error occurred during game generation: {str(e)}")
+
 
 @app.get("/podcast/{job_id}/info")
 async def get_podcast_info(job_id: str):

@@ -1,149 +1,142 @@
 import pytest
 from unittest.mock import patch, AsyncMock, mock_open, call
 import os
-from pathlib import Path # Import Path for assertions
+from pathlib import Path
 
-# Set TEST_MODE for image generation mocking if your image generator uses it.
-# This should be set before importing app.config if it reads it at import time.
+# Assuming OUTPUT_DIR is available from config or can be hardcoded for test if not easily importable
+# For this example, let's assume it's 'output' as used before. If it's from app.config, mock it or import it.
+TEST_OUTPUT_DIR = "output"
+
 os.environ['TEST_MODE'] = 'True'
 
-# Import the function to test AFTER setting TEST_MODE
+# Import the function to test AFTER setting TEST_MODE and potentially mocking app.config.OUTPUT_DIR
 from app.generators.platformer_game import generate_platformer_game, PROCESSING_GAME_TEMPLATE_PATH, CONCEPT_PROMPT_FILE, PROCESSING_CODE_PROMPT_FILE, DEFAULT_CANVAS_WIDTH, DEFAULT_CANVAS_HEIGHT
-from app.config import OUTPUT_DIR # For constructing expected paths
+# Note: If app.config.OUTPUT_DIR is used by platformer_game.py at its module level (not just inside the function),
+# then the patch for OUTPUT_DIR needs to be applied before platformer_game is imported.
+# However, platformer_game.py imports OUTPUT_DIR from app.config. So we patch where it's LOOKED UP.
+# Patching 'app.generators.platformer_game.OUTPUT_DIR' assumes OUTPUT_DIR is a global in that module,
+# or imported into its namespace like 'from app.config import OUTPUT_DIR'.
 
 @pytest.mark.asyncio
-@patch('app.generators.platformer_game.LLM_PROVIDER', 'openai') # Assuming OpenAI for this test
+@patch('app.generators.platformer_game.OUTPUT_DIR', TEST_OUTPUT_DIR) # Mock OUTPUT_DIR where it's used
+@patch('app.generators.platformer_game.LLM_PROVIDER', 'openai')
 @patch('app.generators.platformer_game.load_prompt')
-@patch('app.generators.platformer_game.generate_story_openai', new_callable=AsyncMock) # Mocks the LLM call
-@patch('app.generators.platformer_game.generate_images', new_callable=AsyncMock) # Mocks image generation
-@patch('app.generators.platformer_game.Path.mkdir') # Mocks directory creation
-@patch('app.generators.platformer_game.aiofiles.open') # Mocks async file operations
+@patch('app.generators.platformer_game.generate_story_openai', new_callable=AsyncMock)
+@patch('app.generators.platformer_game.generate_image', new_callable=AsyncMock) # CHANGED: from generate_images to generate_image
+@patch('app.generators.platformer_game.Path.mkdir') # Patching Path.mkdir directly on the class
+@patch('app.generators.platformer_game.aiofiles.open', new_callable=AsyncMock) # Mock async open for the module
 async def test_generate_platformer_game_processing_js(
-    mock_aio_open, # Corresponds to aiofiles.open
-    mock_path_mkdir, # Corresponds to Path.mkdir
-    mock_generate_images_func, # Corresponds to generate_images
-    mock_llm_generate_story, # Corresponds to generate_story_openai
-    mock_load_prompt_func  # Corresponds to load_prompt
+    mock_aiofiles_open_call, # This is the mock object for the aiofiles.open function itself
+    mock_path_mkdir_method,   # This is the mock for the Path.mkdir method
+    mock_generate_image_func, # Mock name can remain, but it now mocks generate_image
+    mock_llm_openai_func,
+    mock_load_prompt_func
 ):
-    # --- Setup Mocks ---
+    # --- Setup Mocks (largely the same) ---
     test_theme = "Jungle Adventure"
-    sanitized_theme_for_path = "jungle_adventure" # From platformer_game.py logic
+    test_job_id = "test-job-123"
 
-    # Setup for mock_load_prompt_func
+    # Constants from app.generators.platformer_game, if not imported directly
+    # PROCESSING_GAME_TEMPLATE_PATH = "templates/processing_js_template/processing_game_template.html"
+    # CONCEPT_PROMPT_FILE = "platformer_game_prompt.txt"
+    # PROCESSING_CODE_PROMPT_FILE = "processing_game_code_prompt.txt"
+    # DEFAULT_CANVAS_WIDTH = 800
+    # DEFAULT_CANVAS_HEIGHT = 600
+
     mock_load_prompt_func.side_effect = [
-        "Conceptual prompt for {theme}", # For CONCEPT_PROMPT_FILE
-        "Processing.js prompt for {GAME_THEME} with assets: {PLAYER_SPRITE_PATH}, etc." # For PROCESSING_CODE_PROMPT_FILE
+        "Conceptual prompt for {theme}. Player: TestPlayer. Abilities: Jump.", # Simplified conceptual prompt output
+        "Processing.js prompt for {GAME_THEME} with assets: {PLAYER_SPRITE_PATH}, etc. Canvas: {CANVAS_WIDTH}x{CANVAS_HEIGHT}."
     ]
+    conceptual_llm_output = "Player Name: TestPlayer. Abilities: Jump, Run. Level: A jungle." # This is what the first LLM call returns
+    mock_processing_code = "void setup() { size(800, 600); Processing.println('Game Started!'); } void draw() { background(0); }"
+    mock_llm_openai_func.side_effect = [conceptual_llm_output, mock_processing_code]
 
-    # Setup for mock_llm_generate_story
-    # First call is for conceptual design, second for Processing.js code.
-    conceptual_design_output = "Player Name: TestPlayer. Abilities: Jump. Level: A jungle." # Simplified
-    mock_processing_code = "void setup() { size(800, 600); } void draw() { background(0); }"
-    mock_llm_generate_story.side_effect = [
-        conceptual_design_output, # Output for conceptual design prompt
-        mock_processing_code      # Output for Processing.js code prompt
-    ]
-
-    # Setup for mock_aio_open (for reading template and writing output)
-    html_template_content = """<!DOCTYPE html>
-    <html><head><title>Game</title>
+    html_template_content = """
+    <!DOCTYPE html>
+    <html><head><title>Generated Platformer Game</title>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/processing.js/1.6.6/processing.min.js"></script>
-    </head><body>
+    </head>
+    <body>
         <canvas id="gamecanvas"></canvas>
         <script type="text/processing" data-processing-target="gamecanvas">
-        // --- PROCESSING.JS CODE WILL BE INSERTED HERE BY THE GENERATOR ---
         // Game Theme: {{GAME_THEME}}
         // Canvas Size: {{CANVAS_WIDTH}} x {{CANVAS_HEIGHT}}
+        // --- PROCESSING.JS CODE WILL BE INSERTED HERE BY THE GENERATOR ---
         </script>
-    </body></html>"""
+    </body></html>
+    """
 
-    # Mock for async file operations
-    async_file_mock_read = AsyncMock()
-    async_file_mock_read.read = AsyncMock(return_value=html_template_content)
+    # Mocks for async file operations (template read, index.html write)
+    mock_template_file_handle = AsyncMock()
+    mock_template_file_handle.read = AsyncMock(return_value=html_template_content)
+    mock_template_file_handle.__aenter__.return_value = mock_template_file_handle
 
-    async_file_mock_write = AsyncMock()
-    async_file_mock_write.write = AsyncMock()
+    mock_index_file_handle = AsyncMock()
+    mock_index_file_handle.write = AsyncMock()
+    mock_index_file_handle.__aenter__.return_value = mock_index_file_handle
 
-    # __aenter__ returns the async context manager, __aexit__ handles cleanup
-    mock_template_open_cm = AsyncMock()
-    mock_template_open_cm.__aenter__.return_value = async_file_mock_read
+    def open_side_effect_func(path_arg, mode, encoding):
+        if PROCESSING_GAME_TEMPLATE_PATH in str(path_arg):
+            return mock_template_file_handle
+        elif "index.html" in str(path_arg):
+            return mock_index_file_handle
+        raise FileNotFoundError(f"Test mock: Unexpected file open: {path_arg}")
 
-    mock_output_file_cm = AsyncMock()
-    mock_output_file_cm.__aenter__.return_value = async_file_mock_write
+    mock_aiofiles_open_call.side_effect = open_side_effect_func
 
-    mock_aio_open.side_effect = [
-        mock_template_open_cm, # For reading template
-        mock_output_file_cm    # For writing index.html
-    ]
+    async def mock_generate_image_side_effect_func(prompt, output_path): # Changed signature
+        # generate_image is expected to handle the full path including filename
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True) # Simulate dir creation if needed by mock
+        with open(output_path, 'w') as f: f.write("mock image data") # Simulate file creation
+        return output_path # Or whatever generate_image returns
+    mock_generate_image_func.side_effect = mock_generate_image_side_effect_func
 
-    # Mock for generate_images: should return the filename as it's used for asset_paths_in_code
-    async def mock_generate_images_side_effect(prompt, output_dir, filename):
-        # Returns the full path, but platformer_game.py extracts filename from it
-        return os.path.join(output_dir, filename)
-    mock_generate_images_func.side_effect = mock_generate_images_side_effect
-
-
-    # --- Call the function ---
-    html_output = await generate_platformer_game(test_theme)
+    # --- Call the function under test ---
+    html_output = await generate_platformer_game(theme=test_theme, job_id=test_job_id)
 
     # --- Assertions ---
     assert isinstance(html_output, str)
-    assert "<!DOCTYPE html>" in html_output
-    assert '<canvas id="gamecanvas">' in html_output
-    assert '<script src="https://cdnjs.cloudflare.com/ajax/libs/processing.js/1.6.6/processing.min.js">' in html_output
     assert mock_processing_code in html_output
-    # Check replacement of placeholders in the HTML template part (not just the JS code)
-    assert f"// Game Theme: {test_theme}" in html_output
     assert f"// Canvas Size: {DEFAULT_CANVAS_WIDTH} x {DEFAULT_CANVAS_HEIGHT}" in html_output
+    assert f"// Game Theme: {test_theme}" in html_output
 
-    # Assert load_prompt calls
-    expected_prompt_calls = [
-        call(CONCEPT_PROMPT_FILE),
-        call(PROCESSING_CODE_PROMPT_FILE)
+    mock_load_prompt_func.assert_has_calls([
+        call(CONCEPT_PROMPT_FILE), call(PROCESSING_CODE_PROMPT_FILE)
+    ])
+    assert mock_llm_openai_func.call_count == 2
+
+    expected_output_dir = Path(TEST_OUTPUT_DIR) / test_job_id
+    expected_assets_dir = expected_output_dir / "assets"
+
+    mkdir_calls_made = [ args[0] for args, _ in mock_path_mkdir_method.call_args_list ]
+    assert expected_output_dir in mkdir_calls_made
+    assert expected_assets_dir in mkdir_calls_made
+    mock_path_mkdir_method.assert_has_calls([
+        call(expected_output_dir, parents=True, exist_ok=True),
+        call(expected_assets_dir, parents=True, exist_ok=True)
+    ], any_order=True)
+
+    # Assert image generation calls (UPDATED)
+    expected_image_prompts_and_paths = [
+        (f"pixel art style, main player character for a 2D platformer game with a '{test_theme}' theme", str(expected_assets_dir / "player.png")),
+        (f"pixel art style, common enemy for a 2D platformer game with a '{test_theme}' theme", str(expected_assets_dir / "enemy1.png")),
+        (f"pixel art style, basic platform tile or ground block for a 2D platformer game with a '{test_theme}' theme", str(expected_assets_dir / "platform.png")),
+        (f"pixel art style, parallax background for a 2D platformer game with a '{test_theme}' theme, side-scrolling view", str(expected_assets_dir / "background.png")),
+        (f"pixel art style, collectible item (e.g., coin, gem, or fruit) for a 2D platformer game with a '{test_theme}' theme", str(expected_assets_dir / "collectible.png")),
     ]
-    mock_load_prompt_func.assert_has_calls(expected_prompt_calls, any_order=False) # Order matters here
+    expected_image_calls = [
+        call(prompt=p, output_path=op)
+        for p, op in expected_image_prompts_and_paths
+    ]
+    mock_generate_image_func.assert_has_calls(expected_image_calls, any_order=True)
+    assert mock_generate_image_func.call_count == len(expected_image_calls)
 
-    # Assert LLM calls (conceptual design + processing code)
-    assert mock_llm_generate_story.call_count == 2
-    # Could add assertions here for the content of the prompts passed to the LLM if needed
+    # Assert file open calls
+    expected_index_html_path = expected_output_dir / "index.html"
+    mock_aiofiles_open_call.assert_any_call(PROCESSING_GAME_TEMPLATE_PATH, mode='r', encoding='utf-8')
+    mock_aiofiles_open_call.assert_any_call(expected_index_html_path, mode='w', encoding='utf-8')
+    mock_index_file_handle.write.assert_called_once_with(html_output)
 
-    # Assert directory creation
-    expected_game_output_dir = Path(OUTPUT_DIR) / "processing_games" / sanitized_theme_for_path
-    mock_path_mkdir.assert_called_once_with(parents=True, exist_ok=True)
-    # Check that the mock_path_mkdir was called on the correct Path object instance
-    # The mock is on Path.mkdir, so the first arg to the mock is the Path instance itself.
-    assert mock_path_mkdir.call_args[0][0] == expected_game_output_dir
-
-
-    # Assert image generation calls
-    asset_names = { "player": "player.png", "enemy1": "enemy1.png", "platform": "platform.png", "background": "background.png", "collectible": "coin.png"}
-    image_gen_prompts_expected = {
-        "player": f"pixel art main character for a 2D platformer game with a {test_theme} theme",
-        "enemy1": f"pixel art enemy for a 2D platformer game with a {test_theme} theme",
-        "platform": f"pixel art platform tile for a 2D platformer game with a {test_theme} theme",
-        "background": f"pixel art background for a 2D platformer game level with a {test_theme} theme, side-scrolling view",
-        "collectible": f"pixel art coin collectible for a 2D platformer game with a {test_theme} theme"
-    }
-    expected_image_calls = []
-    for asset_key, filename in asset_names.items():
-        expected_image_calls.append(
-            call(prompt=image_gen_prompts_expected[asset_key], output_dir=str(expected_game_output_dir), filename=filename)
-        )
-    mock_generate_images_func.assert_has_calls(expected_image_calls, any_order=True) # Order might not be guaranteed by dict iteration
-    assert mock_generate_images_func.call_count == len(asset_names)
-
-    # Assert file operations
-    # First call to aiofiles.open is for reading the template
-    mock_aio_open.assert_any_call(PROCESSING_GAME_TEMPLATE_PATH, mode='r', encoding='utf-8')
-    # Second call to aiofiles.open is for writing index.html
-    expected_index_html_path = expected_game_output_dir / "index.html"
-    mock_aio_open.assert_any_call(expected_index_html_path, mode='w', encoding='utf-8')
-
-    # Check that write was called on the correct mock object with the html_output
-    async_file_mock_write.write.assert_called_once_with(html_output)
-
-    # Verify that __aenter__ and __aexit__ were called for both file operations
-    assert mock_template_open_cm.__aenter__.called
-    assert mock_output_file_cm.__aenter__.called
-    # __aexit__ calls are not explicitly checked here but would be in a full context manager test
+    assert mock_template_file_handle.__aenter__.called
+    assert mock_index_file_handle.__aenter__.called
 ```

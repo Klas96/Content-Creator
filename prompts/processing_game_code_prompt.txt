@@ -1,47 +1,287 @@
-You are an AI game developer skilled in creating simple 2D platformer games using Processing.js.
-Based on the following game design elements, generate the complete Processing.js code for a playable game.
+You are an AI game developer specializing in creating 2D platformer games using Processing.js.
+Your task is to generate the complete Processing.js code for a game based on the provided theme and design elements.
+The generated code will be embedded into an HTML template. Adhere strictly to Processing.js syntax (Java-like).
 
 Game Theme: {{GAME_THEME}}
-Canvas Size: {{CANVAS_WIDTH}}x{{CANVAS_HEIGHT}}
+Canvas Size: {{CANVAS_WIDTH}}x{{CANVAS_HEIGHT}} (e.g., 800x600)
 
 Player Details:
   Name: {{PLAYER_NAME}}
   Appearance: {{PLAYER_APPEARANCE}}
-  Abilities: {{PLAYER_ABILITIES}}
-  Sprite Path: "{{PLAYER_SPRITE_PATH}}"
+  Abilities: {{PLAYER_ABILITIES}} (Focus on 'jump' and basic left/right movement for now)
+  Sprite Path: "{{PLAYER_SPRITE_PATH}}" (e.g., "assets/player.png")
 
-Enemy Concepts (JSON Array):
+Enemy Concepts (JSON Array String):
 {{ENEMY_CONCEPTS}}
-  // Each enemy concept in the JSON array might look like:
-  // { "name": "GuardBot", "appearance": "...", "behavior": "patrols", "sprite_path": "enemy1.png" }
+  // Example: [{"name": "Baddie", "appearance": "A menacing foe", "behavior": "patrols left and right", "sprite_path": "assets/enemy1.png"}]
 
 Level Description: {{LEVEL_DESCRIPTION}}
-Background Image Path: "{{BACKGROUND_IMAGE_PATH}}"
+Background Image Path: "{{BACKGROUND_IMAGE_PATH}}" (e.g., "assets/background.png")
 
-Platform Data (JSON Array):
+Platform Data (JSON Array String):
 {{PLATFORM_DATA}}
-  // Each platform object in the JSON array might look like:
-  // { "x": 100, "y": 200, "width": 100, "height": 20, "sprite_path": "platform.png" }
+  // Example: [{"x": 0, "y": 550, "width": 800, "height": 50, "sprite_path": "assets/platform.png"}]
 
-Collectible Data (JSON Array):
+Collectible Data (JSON Array String):
 {{COLLECTIBLE_DATA}}
-  // Each collectible object in the JSON array might look like:
-  // { "x": 150, "y": 100, "sprite_path": "coin.png" }
+  // Example: [{"x": 300, "y": 400, "type": "coin", "sprite_path": "assets/coin.png"}]
 
-Instructions:
-1.  Initialize the canvas size in `setup()` using `size({{CANVAS_WIDTH}}, {{CANVAS_HEIGHT}});`.
-2.  Load all specified image assets (player, enemies, background, platforms, collectibles) in `setup()` using `loadImage()`. Store them in global variables.
-3.  Implement basic 2D platformer physics: gravity, jumping, and horizontal movement for the player.
-4.  Player movement should respond to arrow keys (LEFT, RIGHT for movement, UP for jump).
-5.  Implement player abilities as described in `{{PLAYER_ABILITIES}}` (e.g., double jump).
-6.  Render the background image.
-7.  Render platforms as static collidable objects. Use their sprite paths. If sprites are tiles, they can be drawn repeatedly or stretched if simple. Assume rectangular collision.
-8.  Render enemies. Implement their described behavior. Enemies should be collidable. For simplicity, basic patrolling or static enemies are fine.
-9.  Render collectibles. Player should be able to collect them (e.g., by overlapping).
-10. Keep the game simple: one level, basic win/lose conditions (e.g., reach a goal, lose if touching an enemy).
-11. Structure the code clearly:
-    *   Use global variables for game objects and assets.
-    *   Use `setup()` for initialization.
-    *   Use `draw()` for the main game loop (update logic, handle input, render objects).
-    *   Define classes for Player, Enemy, Platform, Collectible if it helps organize the code.
-12. Ensure the output is ONLY Processing.js code, ready to be embedded in an HTML file. Do not include any surrounding text or explanations.
+// --- GLOBAL VARIABLES SECTION ---
+// Declare all global variables here. Use Processing.js types.
+
+// Game State
+int gameState; // 0: Start Screen, 1: Playing, 2: Game Over, 3: Win
+final int START_SCREEN = 0;
+final int PLAYING = 1;
+final int GAME_OVER = 2;
+final int WIN = 3;
+
+// Player
+Player player;
+PImage playerSprite;
+boolean moveLeft, moveRight, doJump; // Input flags
+
+// Enemies
+ArrayList<Enemy> enemies;
+// PImage enemySprite; // If all enemies share one sprite, or load individually in Enemy class from path
+
+// Platforms
+ArrayList<Platform> platforms;
+// PImage platformSprite; // If all platforms share one sprite, or load individually
+
+// Collectibles
+ArrayList<Collectible> collectibles;
+// PImage collectibleSprite; // If all collectibles share one sprite, or load individually
+
+// Assets
+PImage backgroundImg;
+
+// Score
+int score;
+
+// --- SETUP FUNCTION ---
+void setup() {
+  size({{CANVAS_WIDTH}}, {{CANVAS_HEIGHT}});
+
+  // Initialize gameState
+  gameState = START_SCREEN;
+  score = 0;
+
+  // Load Sprites (ensure paths are correct as provided in placeholders)
+  playerSprite = loadImage("{{PLAYER_SPRITE_PATH}}");
+  backgroundImg = loadImage("{{BACKGROUND_IMAGE_PATH}}");
+  // LLM: Load other sprites for enemies, platforms, collectibles if they have unique sprites.
+  // Example: PImage specificEnemySprite = loadImage("assets/specific_enemy.png");
+
+  // Initialize Player
+  // LLM: Determine good starting X, Y for player (e.g., middle of first platform or screen bottom-left)
+  float playerStartX = 50;
+  float playerStartY = {{CANVAS_HEIGHT}} - 100; // Adjust as needed
+  player = new Player(playerStartX, playerStartY, playerSprite);
+
+  // Initialize Platforms
+  platforms = new ArrayList<Platform>();
+  // LLM: Parse {{PLATFORM_DATA}} (JSON Array String) and create Platform objects.
+  // Example of manual platform creation (replace with JSON parsing):
+  // platforms.add(new Platform(0, {{CANVAS_HEIGHT}} - 40, {{CANVAS_WIDTH}}, 40, loadImage("{{PLATFORM_DATA[0].sprite_path}}"))); // Ground
+  // platforms.add(new Platform(200, {{CANVAS_HEIGHT}} - 150, 100, 20, loadImage("{{PLATFORM_DATA[1].sprite_path}}"))); // A floating platform
+
+  // Initialize Enemies
+  enemies = new ArrayList<Enemy>();
+  // LLM: Parse {{ENEMY_CONCEPTS}} (JSON Array String) and create Enemy objects.
+  // Example: enemies.add(new Enemy(300, {{CANVAS_HEIGHT}} - 80, loadImage("{{ENEMY_CONCEPTS[0].sprite_path}}"), "{{ENEMY_CONCEPTS[0].behavior}}"));
+
+  // Initialize Collectibles
+  collectibles = new ArrayList<Collectible>();
+  // LLM: Parse {{COLLECTIBLE_DATA}} (JSON Array String) and create Collectible objects.
+  // Example: collectibles.add(new Collectible(400, {{CANVAS_HEIGHT}} - 200, loadImage("{{COLLECTIBLE_DATA[0].sprite_path}}"), "{{COLLECTIBLE_DATA[0].type}}"));
+
+  // Initialize input flags
+  moveLeft = false;
+  moveRight = false;
+  doJump = false;
+}
+
+// --- DRAW FUNCTION (MAIN GAME LOOP) ---
+void draw() {
+  if (gameState == START_SCREEN) {
+    drawStartScreen();
+  } else if (gameState == PLAYING) {
+    runGame();
+  } else if (gameState == GAME_OVER) {
+    drawGameOverScreen();
+  } else if (gameState == WIN) {
+    drawWinScreen();
+  }
+}
+
+void drawStartScreen() {
+  background(100, 150, 200); // Light blue background
+  textAlign(CENTER);
+  textSize(40);
+  fill(255);
+  text("{{GAME_THEME}}", width/2, height/2 - 50);
+  textSize(20);
+  text("Press ENTER to Start", width/2, height/2 + 20);
+}
+
+void runGame() {
+  // Drawing
+  if (backgroundImg != null) {
+    image(backgroundImg, 0, 0, width, height);
+  } else {
+    background(150, 200, 250); // Default sky blue
+  }
+
+  for (Platform p : platforms) {
+    p.display();
+  }
+  for (Enemy e : enemies) {
+    e.display();
+    e.update(platforms); // Pass platforms for enemy AI if needed
+  }
+  for (int i = collectibles.size() - 1; i >= 0; i--) {
+    Collectible c = collectibles.get(i);
+    c.display();
+    if (checkCollision(player.x, player.y, player.w, player.h, c.x, c.y, c.w, c.h)) {
+      collectibles.remove(i);
+      score += 10; // Or c.value
+    }
+  }
+  player.update(platforms);
+  player.display();
+
+  // Display Score
+  fill(0);
+  textSize(20);
+  textAlign(LEFT);
+  text("Score: " + score, 20, 30);
+
+  // LLM: Implement basic win/lose conditions
+  // Example: if player touches an enemy, gameState = GAME_OVER;
+  // Example: if score reaches a target or player reaches a goal position, gameState = WIN;
+  for (Enemy e : enemies) {
+    if (checkCollision(player.x, player.y, player.w, player.h, e.x, e.y, e.w, e.h)) {
+        gameState = GAME_OVER;
+        break;
+    }
+  }
+  if (collectibles.isEmpty() && gameState == PLAYING) { // Example win: collect all items
+     // gameState = WIN; // This might be too simple, let LLM decide or use a goal object
+  }
+}
+
+void drawGameOverScreen() {
+  background(50, 50, 50); // Dark background
+  textAlign(CENTER);
+  textSize(50);
+  fill(255, 0, 0);
+  text("GAME OVER", width/2, height/2 - 30);
+  textSize(20);
+  fill(255);
+  text("Your Score: " + score, width/2, height/2 + 20);
+  text("Press ENTER to Restart", width/2, height/2 + 60);
+}
+
+void drawWinScreen() {
+  background(150, 250, 150); // Light green background
+  textAlign(CENTER);
+  textSize(50);
+  fill(0, 150, 0);
+  text("YOU WIN!", width/2, height/2 - 30);
+  textSize(20);
+  fill(0);
+  text("Your Score: " + score, width/2, height/2 + 20);
+  text("Press ENTER to Restart", width/2, height/2 + 60);
+}
+
+
+// --- INPUT HANDLING ---
+void keyPressed() {
+  if (key == CODED) {
+    if (keyCode == LEFT) {
+      moveLeft = true;
+    } else if (keyCode == RIGHT) {
+      moveRight = true;
+    } else if (keyCode == UP) {
+      doJump = true; // Player class will handle if jump is possible
+    }
+  }
+  if (key == ENTER || key == RETURN) {
+    if (gameState == START_SCREEN || gameState == GAME_OVER || gameState == WIN) {
+      // Reset game
+      setup(); // Re-initialize everything
+      gameState = PLAYING;
+    }
+  }
+}
+
+void keyReleased() {
+  if (key == CODED) {
+    if (keyCode == LEFT) {
+      moveLeft = false;
+    } else if (keyCode == RIGHT) {
+      moveRight = false;
+    } else if (keyCode == UP) {
+      doJump = false; // Optional: some jump mechanics might not need this
+    }
+  }
+}
+
+// --- COLLISION DETECTION ---
+// AABB (Axis-Aligned Bounding Box) collision check
+boolean checkCollision(float x1, float y1, float w1, float h1, float x2, float y2, float w2, float h2) {
+  return (x1 < x2 + w2 &&
+          x1 + w1 > x2 &&
+          y1 < y2 + h2 &&
+          y1 + h1 > y2);
+}
+
+// --- CLASSES ---
+
+// ** Player Class **
+// LLM: Define the Player class here.
+// Properties: float x, y, w, h (width/height for sprite/collision), vx, vy, speed, jumpForce, gravity. boolean onGround. PImage sprite.
+// Constructor: Player(float startX, float startY, PImage spr)
+// Methods:
+//   void update(ArrayList<Platform> platforms): Handle movement (left/right from moveLeft/moveRight flags), jumping (from doJump flag), gravity.
+//                                              Implement platform collision (stop falling through, stop at sides). Set onGround flag.
+//   void display(): Draw the player sprite.
+
+// ** Platform Class **
+// LLM: Define the Platform class here.
+// Properties: float x, y, w, h. PImage sprite (optional, can be null). color platformColor (if no sprite).
+// Constructor: Platform(float x, float y, float w, float h, PImage spr)
+// Methods:
+//   void display(): Draw the platform (either sprite or a colored rectangle).
+
+// ** Enemy Class **
+// LLM: Define the Enemy class here.
+// Properties: float x, y, w, h, vx. PImage sprite. String behavior (e.g., "patrol"). float patrolMinX, patrolMaxX (if patrolling).
+// Constructor: Enemy(float x, float y, PImage spr, String type)
+// Methods:
+//   void update(ArrayList<Platform> platforms): Implement behavior (e.g., if "patrol", move left/right between bounds, turn at edges or platform ends).
+//   void display(): Draw enemy sprite.
+
+// ** Collectible Class **
+// LLM: Define the Collectible class here.
+// Properties: float x, y, w, h. PImage sprite. String type (e.g., "coin"). boolean collected.
+// Constructor: Collectible(float x, float y, PImage spr, String itemType)
+// Methods:
+//   void display(): Draw if not collected.
+
+// LLM Notes:
+// - Ensure all variables are declared with their types (e.g., float, int, boolean, PImage, ArrayList<Type>).
+// - Initialize all necessary variables in setup() or constructors.
+// - Use `loadImage()` in `setup()` for all PImages. Paths are relative to the HTML file (e.g., "assets/player.png").
+// - Parse the JSON strings {{PLATFORM_DATA}}, {{ENEMY_CONCEPTS}}, {{COLLECTIBLE_DATA}} in setup() to populate the ArrayLists.
+//   You might need to manually loop or use a JSON parsing helper if Processing.js doesn't have one built-in for complex JSON.
+//   For simplicity in this prompt, you can assume these JSON strings will be simple arrays of objects
+//   and can be parsed by iterating (if simple) or by providing a simple parsing example if needed.
+//   Focus on getting the core classes and game loop functional.
+//   For parsing JSON, a simple approach is to provide the data in a more direct format if the LLM struggles with JSON parsing in Processing.js.
+//   However, the current generator prepares these as JSON strings. The LLM should attempt to outline how it would parse them.
+//   If direct JSON parsing in Processing.js via LLM is too complex, the LLM can use the example data structure
+//   commented in the prompt (e.g. for platforms, enemies) and hardcode a few instances for now.
+// - Remember Processing.js coordinate system: (0,0) is top-left. Y increases downwards.
+// - Make sure the game is playable.
